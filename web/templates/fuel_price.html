@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="header-inner">
+                <div class="logo">
+                    <span class="logo-icon">&#x1F4B1;</span>
+                    <h1>POV AI <span class="logo-sub">Indonesia</span></h1>
+                </div>
+                <nav class="nav">
+                    <a href="/" class="nav-link" data-page="dashboard">Dashboard</a>
+                    <a href="javascript:void(0)" class="nav-link active">{{.title}}</a>
+                </nav>
+            </div>
+        </header>
+        <main class="main" id="main-content"><div class="loading">Memuat data</div></main>
+        <footer class="footer"><p>POV AI Indonesia &mdash; AI-powered economic insight platform</p></footer>
+    </div>
+    <script src="/static/js/app.js"></script>
+    <script>document.addEventListener('DOMContentLoaded', () => renderFuelPricePage());</script>
+</body>
+</html>
