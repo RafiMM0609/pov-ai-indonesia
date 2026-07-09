@@ -37,7 +37,7 @@ func main() {
 
 	sc := scraper.New(cfg.SeedPrices, cfg.FrankfurterStartDate, cfg.ScraperHTTPTimeout, cfg.FrankfurterBaseURL, cfg.SearchTimeout, cfg.SearchEngineURL, cfg.SearchDomainFilter)
 	es := scraper.NewEnhancedScraper(cfg)
-	km := knowledge.NewKnowledgeManager(cfg.KnowledgeDir, aiClient)
+	km := knowledge.NewKnowledgeManager(cfg.KnowledgeDir, aiClient, database)
 
 	// --- Seed data if empty ---
 	seedData(database, sc, es)
@@ -46,7 +46,7 @@ func main() {
 	fmt.Println("[main] Pre-generating template insights (fast)...")
 	start := time.Now()
 	years := getAllYears(database)
-	km.RegenerateAllTemplates(years, database.GetExchangeRates, database.GetFuelPrices)
+	km.RegenerateAllTemplates(years)
 	fmt.Printf("[main] Template insights ready in %v\n", time.Since(start))
 
 	// --- Start server (all reads from disk, zero LLM during HTTP) ---
@@ -66,7 +66,7 @@ func main() {
 	if aiClient.IsEnabled() {
 		fmt.Println("[main] Starting background LLM enrichment (slow, non-blocking)...")
 		go func() {
-			km.RegenerateAll(years, database.GetExchangeRates, database.GetFuelPrices)
+			km.RegenerateAll(years)
 			fmt.Println("[main] LLM enrichment complete!")
 		}()
 	}
@@ -90,7 +90,7 @@ func main() {
 					fmt.Printf("[cron] Error getting exchange rate years: %v\n", err)
 					return
 				}
-				km.RegenerateAll(years, database.GetExchangeRates, database.GetFuelPrices)
+				km.RegenerateAll(years)
 			}
 		})
 	}
@@ -104,7 +104,7 @@ func main() {
 			} else {
 				if aiClient.IsEnabled() {
 					years := getAllYears(database)
-					km.RegenerateAll(years, database.GetExchangeRates, database.GetFuelPrices)
+					km.RegenerateAll(years)
 				}
 			}
 		})
@@ -260,7 +260,7 @@ func scrapeData(database *db.DB, sc *scraper.Scraper, km *knowledge.KnowledgeMan
 
 	if llmOK {
 		years := getAllYears(database)
-		km.RegenerateAll(years, database.GetExchangeRates, database.GetFuelPrices)
+		km.RegenerateAll(years)
 	}
 }
 

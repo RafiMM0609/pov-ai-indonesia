@@ -13,29 +13,65 @@ import (
 	"github.com/anton/pov-ai-indonesia/pkg/models"
 )
 
+type Database interface {
+	GetExchangeRates(year, month int) ([]models.ExchangeRate, error)
+	GetFuelPrices(year, month int, bbmType, region string) ([]models.FuelPrice, error)
+	GetBPSIndicators(year int, indicatorID, region string) ([]models.BPSEconomicIndicator, error)
+	GetBIRates(year int, rateType string) ([]models.BIRate, error)
+}
+
 type KnowledgeManager struct {
 	knowledgeDir string
 	aiClient     *ai.Client
+	db           Database
 }
 
-func NewKnowledgeManager(knowledgeDir string, aiClient *ai.Client) *KnowledgeManager {
+func NewKnowledgeManager(knowledgeDir string, aiClient *ai.Client, db Database) *KnowledgeManager {
 	os.MkdirAll(knowledgeDir, 0755)
 	return &KnowledgeManager{
 		knowledgeDir: knowledgeDir,
 		aiClient:     aiClient,
+		db:           db,
 	}
 }
 
-func (km *KnowledgeManager) RegenerateAll(years []int,
-	getRates func(year, month int) ([]models.ExchangeRate, error),
-	getFuel func(year, month int, bbmType, region string) ([]models.FuelPrice, error)) {
+func (km *KnowledgeManager) getMacroContext(year, month int) string {
+	if km.db == nil {
+		return "Konteks makroekonomi tidak tersedia."
+	}
+	var sb strings.Builder
 
+	indicators, err := km.db.GetBPSIndicators(year, "", "Indonesia")
+	if err == nil && len(indicators) > 0 {
+		sb.WriteString("Indikator Ekonomi BPS:\n")
+		for _, ind := range indicators {
+			sb.WriteString(fmt.Sprintf("- %s (%s, %s): %.2f %s\n", ind.Indicator, ind.Period, getPeriodName(ind.Year, 0), ind.Value, ind.Unit))
+		}
+		sb.WriteString("\n")
+	}
+
+	rates, err := km.db.GetBIRates(year, "")
+	if err == nil && len(rates) > 0 {
+		sb.WriteString("Suku Bunga Kebijakan Bank Indonesia (BI):\n")
+		for _, r := range rates {
+			sb.WriteString(fmt.Sprintf("- %s (efektif %s): %.2f%%\n", r.RateType, r.EffectiveDate, r.Value))
+		}
+		sb.WriteString("\n")
+	}
+
+	if sb.Len() == 0 {
+		return "Tidak ada data indikator makroekonomi domestik spesifik untuk periode ini."
+	}
+	return sb.String()
+}
+
+func (km *KnowledgeManager) RegenerateAll(years []int) {
 	llmOK := km.aiClient.IsEnabled()
 	total := 0
 	generatedFiles := make(map[string]bool)
 
 	for _, year := range years {
-		rates, err := getRates(year, 0)
+		rates, err := km.db.GetExchangeRates(year, 0)
 		if err != nil {
 			fmt.Printf("[knowledge] Error getting rates for %d: %v\n", year, err)
 		} else if len(rates) > 0 {
@@ -46,7 +82,7 @@ func (km *KnowledgeManager) RegenerateAll(years []int,
 			}
 			if year >= 2024 {
 				for m := 1; m <= 12; m++ {
-					mr, err := getRates(year, m)
+					mr, err := km.db.GetExchangeRates(year, m)
 					if err != nil {
 						continue
 					}
@@ -61,7 +97,7 @@ func (km *KnowledgeManager) RegenerateAll(years []int,
 			}
 		}
 
-		fuel, err := getFuel(year, 0, "", "Indonesia")
+		fuel, err := km.db.GetFuelPrices(year, 0, "", "Indonesia")
 		if err != nil {
 			fmt.Printf("[knowledge] Error getting fuel for %d: %v\n", year, err)
 		} else if len(fuel) > 0 {
@@ -72,7 +108,7 @@ func (km *KnowledgeManager) RegenerateAll(years []int,
 			}
 			if year >= 2024 {
 				for m := 1; m <= 12; m++ {
-					mf, err := getFuel(year, m, "", "Indonesia")
+					mf, err := km.db.GetFuelPrices(year, m, "", "Indonesia")
 					if err != nil {
 						continue
 					}
@@ -102,10 +138,7 @@ func (km *KnowledgeManager) RegenerateAll(years []int,
 	fmt.Printf("[knowledge] Generated %d insights (LLM: %v)\n", total, llmOK)
 }
 
-func (km *KnowledgeManager) RegenerateAllTemplates(years []int,
-	getRates func(year, month int) ([]models.ExchangeRate, error),
-	getFuel func(year, month int, bbmType, region string) ([]models.FuelPrice, error)) {
-
+func (km *KnowledgeManager) RegenerateAllTemplates(years []int) {
 	total := 0
 
 	entries, err := os.ReadDir(km.knowledgeDir)
@@ -118,7 +151,7 @@ func (km *KnowledgeManager) RegenerateAllTemplates(years []int,
 	}
 
 	for _, year := range years {
-		rates, err := getRates(year, 0)
+		rates, err := km.db.GetExchangeRates(year, 0)
 		if err != nil {
 			fmt.Printf("[knowledge] Error getting rates for %d: %v\n", year, err)
 		} else if len(rates) > 0 {
@@ -127,7 +160,7 @@ func (km *KnowledgeManager) RegenerateAllTemplates(years []int,
 			}
 			if year >= 2024 {
 				for m := 1; m <= 12; m++ {
-					mr, err := getRates(year, m)
+					mr, err := km.db.GetExchangeRates(year, m)
 					if err != nil {
 						continue
 					}
@@ -140,7 +173,7 @@ func (km *KnowledgeManager) RegenerateAllTemplates(years []int,
 			}
 		}
 
-		fuel, err := getFuel(year, 0, "", "Indonesia")
+		fuel, err := km.db.GetFuelPrices(year, 0, "", "Indonesia")
 		if err != nil {
 			fmt.Printf("[knowledge] Error getting fuel for %d: %v\n", year, err)
 		} else if len(fuel) > 0 {
@@ -149,7 +182,7 @@ func (km *KnowledgeManager) RegenerateAllTemplates(years []int,
 			}
 			if year >= 2024 {
 				for m := 1; m <= 12; m++ {
-					mf, err := getFuel(year, m, "", "Indonesia")
+					mf, err := km.db.GetFuelPrices(year, m, "", "Indonesia")
 					if err != nil {
 						continue
 					}
@@ -177,12 +210,18 @@ func (km *KnowledgeManager) genExchangeRate(rates []models.ExchangeRate, year, m
 
 	if llm {
 		dataJSON := formatRatesData(rates)
-		resp, err := km.aiClient.AnalyzeExchangeRate(dataJSON, period)
+		macroContext := km.getMacroContext(year, month)
+		resp, err := km.aiClient.AnalyzeExchangeRate(dataJSON, period, macroContext)
 		if err == nil {
 			title = resp.Title
 			summary = resp.Summary
-			factors = FactorsFromStrings(resp.Factors)
+			factors = []Factor{}
+			for _, f := range resp.Factors {
+				factors = append(factors, Factor{Title: f.Title, Description: f.Description})
+			}
 			analysis = resp.Analysis
+		} else {
+			fmt.Printf("[knowledge] AI ExchangeRate analysis failed, using fallback: %v\n", err)
 		}
 	}
 
@@ -218,12 +257,18 @@ func (km *KnowledgeManager) genFuelPrice(prices []models.FuelPrice, year, month 
 
 	if llm {
 		dataJSON := formatFuelData(prices)
-		resp, err := km.aiClient.AnalyzeFuelPrice(dataJSON, period)
+		macroContext := km.getMacroContext(year, month)
+		resp, err := km.aiClient.AnalyzeFuelPrice(dataJSON, period, macroContext)
 		if err == nil {
 			title = resp.Title
 			summary = resp.Summary
-			factors = FactorsFromStrings(resp.Factors)
+			factors = []Factor{}
+			for _, f := range resp.Factors {
+				factors = append(factors, Factor{Title: f.Title, Description: f.Description})
+			}
 			analysis = resp.Analysis
+		} else {
+			fmt.Printf("[knowledge] AI FuelPrice analysis failed, using fallback: %v\n", err)
 		}
 	}
 

@@ -369,7 +369,7 @@ func (s *Server) handleRegenerate(c *gin.Context) {
 		}
 	}
 
-	go s.knowledge.RegenerateAll(years, s.database.GetExchangeRates, s.database.GetFuelPrices)
+	go s.knowledge.RegenerateAll(years)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
@@ -427,7 +427,7 @@ func (s *Server) handleAdminScrape(c *gin.Context) {
 	// Refresh insights in the background using the latest available data.
 	if s.aiEnabled {
 		years := getAllYearsSafe(s.database)
-		go s.knowledge.RegenerateAll(years, s.database.GetExchangeRates, s.database.GetFuelPrices)
+		go s.knowledge.RegenerateAll(years)
 	}
 
 	c.JSON(http.StatusOK, resp)

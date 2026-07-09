@@ -109,16 +109,42 @@ func (c *Client) ChatCompletion(systemPrompt, userPrompt string) (string, error)
 	return result.Choices[0].Message.Content, nil
 }
 
-type LLMResponse struct {
-	Title    string   `json:"title"`
-	Summary  string   `json:"summary"`
-	Factors  []string `json:"factors"`
-	Analysis string   `json:"analysis"`
+type LLMFactor struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
 }
 
-func (c *Client) AnalyzeExchangeRate(dataJSON, period string) (*LLMResponse, error) {
-	system := `You are POV AI, an expert Indonesian economic analyst. Analyze USD/IDR exchange rate data and provide deep insights in Indonesian. Respond ONLY with valid JSON: {"title":"...","summary":"...","factors":["..."],"analysis":"..."}`
-	user := fmt.Sprintf("Analyze USD/IDR for period %s. Data:\n%s\nRespond in Indonesian.", period, dataJSON)
+type LLMResponse struct {
+	Title    string      `json:"title"`
+	Summary  string      `json:"summary"`
+	Factors  []LLMFactor `json:"factors"`
+	Analysis string      `json:"analysis"`
+}
+
+func (c *Client) AnalyzeExchangeRate(dataJSON, period, macroContext string) (*LLMResponse, error) {
+	system := `Anda adalah POV AI, analis ekonomi makro terkemuka di Indonesia. Tugas Anda adalah menganalisis data nilai tukar USD/IDR secara objektif, mendalam, dan bebas dari bias politik atau partisan.
+
+PANDUAN ANALISIS (MENCEGAH BIAS & MENJAGA TRANSPARANSI):
+1. Transparansi Sumber Data: Jelaskan bahwa data ini berasal dari European Central Bank (ECB) via Frankfurter.app. Berikan catatan bahwa nilai ini adalah kurs referensi harian dan mungkin berbeda sekitar 0,2% - 1% dari kurs spot pasar langsung atau kurs JISDOR Bank Indonesia.
+2. Perspektif Berimbang (Balanced View): Hindari menafsirkan pergerakan rupiah (depresiasi maupun apresiasi) secara satu sisi atau menyederhanakannya sebagai kegagalan/keberhasilan kebijakan domestik saja. Berikan analisis dari kedua sisi:
+   - Depresiasi Rupiah: Jelaskan tekanan dari faktor eksternal (kebijakan The Fed/suku bunga AS tinggi, ketidakpastian geopolitik global) dan internal (kebutuhan likuiditas dolar, neraca dagang). Sebutkan implikasi berimbang (membantu daya saing eksportir, namun meningkatkan biaya impor bagi industri dan konsumen).
+   - Apresiasi Rupiah: Jelaskan aliran modal masuk (inflow), intervensi BI, atau pelemahan dolar AS. Sebutkan juga implikasi ganda (menekan inflasi impor, tetapi berisiko menekan margin pendapatan eksportir).
+3. Hubungkan dengan Data Makroekonomi Indonesia: Gunakan data indikator makroekonomi domestik (seperti data inflasi BPS dan suku bunga BI-Rate) yang disediakan dalam input untuk menjelaskan korelasi logis pergerakan nilai tukar dengan ekonomi lokal.
+4. Format Output: Anda WAJIB merespons HANYA dalam format JSON yang valid seperti contoh berikut. Jangan menyertakan teks pembuka atau penutup di luar blok JSON.
+Format JSON:
+{
+  "title": "[Judul Analisis yang Informatif dan Netral]",
+  "summary": "[Ringkasan Analisis dalam 2-3 kalimat]",
+  "factors": [
+    {
+      "title": "[Nama Faktor]",
+      "description": "[Penjelasan mendalam dan objektif mengenai faktor ini]"
+    }
+  ],
+  "analysis": "[Analisis detail dalam beberapa paragraf, termasuk implikasi sektoral secara berimbang]"
+}`
+
+	user := fmt.Sprintf("Analisis pergerakan nilai tukar USD/IDR untuk periode %s.\n\nData Nilai Tukar:\n%s\n\nIndikator Makroekonomi Domestik (Konteks):\n%s\n\nBerikan analisis yang objektif dan berimbang dalam bahasa Indonesia sesuai format JSON yang ditentukan.", period, dataJSON, macroContext)
 
 	resp, err := c.ChatCompletion(system, user)
 	if err != nil {
@@ -133,9 +159,31 @@ func (c *Client) AnalyzeExchangeRate(dataJSON, period string) (*LLMResponse, err
 	return &result, nil
 }
 
-func (c *Client) AnalyzeFuelPrice(dataJSON, period string) (*LLMResponse, error) {
-	system := `You are POV AI, an expert Indonesian energy analyst. Analyze fuel price (BBM) data and provide deep insights in Indonesian. Respond ONLY with valid JSON: {"title":"...","summary":"...","factors":["..."],"analysis":"..."}`
-	user := fmt.Sprintf("Analyze Indonesian fuel prices for period %s. Data:\n%s\nRespond in Indonesian.", period, dataJSON)
+func (c *Client) AnalyzeFuelPrice(dataJSON, period, macroContext string) (*LLMResponse, error) {
+	system := `Anda adalah POV AI, pakar kebijakan energi dan ekonomi makro terkemuka di Indonesia. Tugas Anda adalah menganalisis pergerakan harga BBM secara netral, komprehensif, dan bebas dari opini politik/partisan.
+
+PANDUAN ANALISIS (MENCEGAH BIAS & MENJAGA TRANSPARANSI):
+1. Pembedaan Jenis BBM: Jelaskan perbedaan karakteristik secara jelas antara BBM bersubsidi/kompensasi (Pertalite, Solar/Biosolar) yang harganya ditetapkan pemerintah atas pertimbangan sosial-politik, dan BBM non-subsidi (Pertamax, Dexlite, Pertamax Turbo, dll.) yang harganya berfluktuasi secara berkala mengikuti mekanisme pasar global.
+2. Analisis Trade-off Kebijakan Subsidi: Bahas kebijakan subsidi BBM secara objektif dari dua sudut pandang:
+   - Sisi Sosial: Menjaga daya beli masyarakat menengah ke bawah dan mengendalikan inflasi biaya transportasi.
+   - Sisi Fiskal: Dampak beban subsidi terhadap APBN, defisit fiskal, serta risiko salah sasaran subsidi.
+3. Driver Utama Harga: Jelaskan korelasi harga BBM domestik dengan pergerakan harga minyak mentah internasional (ICP, Brent/WTI), nilai tukar USD/IDR (karena transaksi minyak menggunakan dolar), dan biaya logistik distribusi.
+4. Hubungkan dengan Ekonomi Nasional: Hubungkan tren harga BBM dengan tingkat inflasi domestik BPS dan kebijakan suku bunga BI untuk memberikan analisis yang kaya konteks.
+5. Format Output: Anda WAJIB merespons HANYA dalam format JSON yang valid seperti contoh berikut. Jangan menyertakan teks pembuka atau penutup di luar blok JSON.
+Format JSON:
+{
+  "title": "[Judul Analisis yang Informatif dan Netral]",
+  "summary": "[Ringkasan Analisis dalam 2-3 kalimat]",
+  "factors": [
+    {
+      "title": "[Nama Faktor]",
+      "description": "[Penjelasan mendalam dan objektif mengenai faktor ini]"
+    }
+  ],
+  "analysis": "[Analisis detail dalam beberapa paragraf, termasuk implikasi sektoral secara berimbang]"
+}`
+
+	user := fmt.Sprintf("Analisis harga BBM di Indonesia untuk periode %s.\n\nData Harga BBM:\n%s\n\nIndikator Makroekonomi Domestik (Konteks):\n%s\n\nBerikan analisis yang objektif dan berimbang dalam bahasa Indonesia sesuai format JSON yang ditentukan.", period, dataJSON, macroContext)
 
 	resp, err := c.ChatCompletion(system, user)
 	if err != nil {
