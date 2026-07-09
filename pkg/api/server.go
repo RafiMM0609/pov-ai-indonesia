@@ -82,8 +82,8 @@ func (s *Server) setupRoutes(staticDir, templateDir string) {
 	s.router.GET("/", s.handleIndex)
 	s.router.GET("/exchange-rate", s.handleExchangeRatePage)
 	s.router.GET("/fuel-price", s.handleFuelPricePage)
-	s.router.GET("/sources", s.handleIndex)
-	s.router.GET("/commodities", s.handleIndex) // SPA - same HTML, JS handles routing
+	s.router.GET("/sources", s.handleSourcesPage)
+	s.router.GET("/commodities", s.handleCommoditiesPage) // SPA - same HTML, JS handles routing
 }
 
 func (s *Server) Run(port string) error {
@@ -490,12 +490,21 @@ func (s *Server) handleIndex(c *gin.Context) {
 }
 
 func (s *Server) handleExchangeRatePage(c *gin.Context) {
-	c.HTML(http.StatusOK, "exchange_rate.html", gin.H{"title": "USD/IDR - POV AI Indonesia"})
+	c.HTML(http.StatusOK, "index.html", gin.H{"title": "USD/IDR - POV AI Indonesia"})
 }
 
 func (s *Server) handleFuelPricePage(c *gin.Context) {
-	c.HTML(http.StatusOK, "fuel_price.html", gin.H{"title": "Harga BBM - POV AI Indonesia"})
+	c.HTML(http.StatusOK, "index.html", gin.H{"title": "Harga BBM - POV AI Indonesia"})
 }
+
+func (s *Server) handleSourcesPage(c *gin.Context) {
+	c.HTML(http.StatusOK, "index.html", gin.H{"title": "Sumber Data - POV AI Indonesia"})
+}
+
+func (s *Server) handleCommoditiesPage(c *gin.Context) {
+	c.HTML(http.StatusOK, "index.html", gin.H{"title": "Kebutuhan Pokok - POV AI Indonesia"})
+}
+
 
 // Government data handlers
 func (s *Server) handleBPSIndicators(c *gin.Context) {

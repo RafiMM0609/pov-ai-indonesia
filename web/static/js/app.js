@@ -16,18 +16,23 @@ document.addEventListener('DOMContentLoaded', () => {
 function navigateTo(path) {
     if (path.includes('exchange-rate')) {
         setActiveNav('exchange');
+        document.title = "USD/IDR - POV AI Indonesia";
         renderExchangeRatePage();
     } else if (path.includes('fuel-price')) {
         setActiveNav('fuel');
+        document.title = "Harga BBM - POV AI Indonesia";
         renderFuelPricePage();
     } else if (path.includes('commodities')) {
         setActiveNav('commodities');
+        document.title = "Kebutuhan Pokok - POV AI Indonesia";
         renderCommoditiesPage();
     } else if (path.includes('sources') || path.includes('sumber-data')) {
         setActiveNav('sources');
+        document.title = "Sumber Data - POV AI Indonesia";
         renderSourcesPage();
     } else {
         setActiveNav('dashboard');
+        document.title = "POV AI Indonesia";
         renderDashboard();
     }
 }
@@ -46,16 +51,16 @@ function setupNavigation() {
         navToggle.addEventListener('click', () => {
             const isOpen = mainNav.classList.toggle('open');
             navToggle.setAttribute('aria-expanded', isOpen);
-            navToggle.innerHTML = isOpen ? '&#10005;' : '&#9776;';
+            navToggle.innerHTML = isOpen ? '&#10005;' : '&#8801;';
         });
     }
-
+ 
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
             // Close mobile nav
             if (mainNav) mainNav.classList.remove('open');
-            if (navToggle) { navToggle.setAttribute('aria-expanded', false); navToggle.innerHTML = '&#9776;'; }
+            if (navToggle) { navToggle.setAttribute('aria-expanded', false); navToggle.innerHTML = '&#8801;'; }
             const page = link.dataset.page;
             let path = '/';
             if (page === 'exchange') path = '/exchange-rate';

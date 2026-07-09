@@ -519,7 +519,7 @@ body {
 
 /* ===================== RESPONSIVE — MOBILE HAMBURGER NAV ===================== */
 .nav-toggle {
-    display: none;
+    display: none !important;
     background: none;
     border: 1px solid var(--border);
     color: var(--text-secondary);
@@ -537,6 +537,14 @@ body {
     .sources-grid { grid-template-columns: 1fr; }
 }
 
+@media (min-width: 769px) and (max-width: 1024px) {
+    .header { padding: 0 16px; }
+    .logo-icon { font-size: 20px; }
+    .logo h1 { font-size: 15px; }
+    .nav { gap: 2px; }
+    .nav-link { padding: 6px 10px; font-size: 12px; }
+}
+
 /* ===================== RESPONSIVE — MOBILE ===================== */
 @media (max-width: 768px) {
     /* Header & Nav */
@@ -551,7 +559,7 @@ body {
     .logo { flex: 1; }
     .logo h1 { font-size: 15px; }
     .logo-icon { font-size: 20px; }
-    .nav-toggle { display: block; }
+    .nav-toggle { display: block !important; }
     .nav {
         display: none;
         flex-direction: column;
