@@ -39,9 +39,23 @@ function setActiveNav(page) {
 }
 
 function setupNavigation() {
+    // Hamburger toggle
+    const navToggle = document.getElementById('nav-toggle');
+    const mainNav = document.getElementById('main-nav');
+    if (navToggle && mainNav) {
+        navToggle.addEventListener('click', () => {
+            const isOpen = mainNav.classList.toggle('open');
+            navToggle.setAttribute('aria-expanded', isOpen);
+            navToggle.innerHTML = isOpen ? '&#10005;' : '&#9776;';
+        });
+    }
+
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
+            // Close mobile nav
+            if (mainNav) mainNav.classList.remove('open');
+            if (navToggle) { navToggle.setAttribute('aria-expanded', false); navToggle.innerHTML = '&#9776;'; }
             const page = link.dataset.page;
             let path = '/';
             if (page === 'exchange') path = '/exchange-rate';
@@ -341,8 +355,10 @@ async function renderExchangeRatePage() {
             <div class="data-table-header"><span class="data-table-title">Data Historis</span>
                 <span style="color:var(--text-muted);font-size:12px">${rates.length} records</span>
             </div>
+            <div class="data-table-scroll">
             <table class="data-table"><thead><tr><th>Tanggal</th><th>Rate (IDR)</th></tr></thead>
             <tbody>${rates.slice(0,50).map(r => `<tr><td>${r.date}</td><td>Rp ${fmt(r.rate)}</td></tr>`).join('')}</tbody></table>
+            </div>
         </div>
     `;
 
@@ -446,8 +462,10 @@ async function renderFuelPricePage() {
         html += `
             <div class="data-table-container">
                 <div class="data-table-header"><span class="data-table-title">Harga BBM Terbaru</span></div>
+                <div class="data-table-scroll">
                 <table class="data-table"><thead><tr><th>Jenis BBM</th><th>Harga (Rp)</th><th>Tanggal</th><th>Sumber</th></tr></thead>
                 <tbody>${latest.data.map(p => `<tr><td>${p.bbm_type}</td><td>Rp ${fmt(p.price)}</td><td>${p.date}</td><td>${p.source}</td></tr>`).join('')}</tbody></table>
+                </div>
             </div>
         `;
     }
@@ -471,8 +489,10 @@ async function renderFuelPricePage() {
             <div class="data-table-header"><span class="data-table-title">Data Historis</span>
                 <span style="color:var(--text-muted);font-size:12px">${prices.length} records</span>
             </div>
+            <div class="data-table-scroll">
             <table class="data-table"><thead><tr><th>Tanggal</th><th>Jenis BBM</th><th>Harga (Rp)</th></tr></thead>
             <tbody>${prices.slice(0,50).map(p => `<tr><td>${p.date}</td><td>${p.bbm_type}</td><td>Rp ${fmt(p.price)}</td></tr>`).join('')}</tbody></table>
+            </div>
         </div>
     `;
 
@@ -622,10 +642,12 @@ async function renderCommoditiesPage() {
     html += `
         <div class="data-table-container">
             <div class="data-table-header"><span class="data-table-title">Tabel Harga ${currentWilayah}</span></div>
+            <div class="data-table-scroll">
             <table class="data-table">
                 <thead><tr><th>Komoditas</th><th>Jenis</th><th>Harga (Rp)</th><th>Unit</th></tr></thead>
                 <tbody>${prices.map(p => `<tr><td>${p.commodity}</td><td>${p.type}</td><td>${formatPrice(p.price)}</td><td>${p.unit}</td></tr>`).join('')}</tbody>
             </table>
+            </div>
         </div>
         <div class="disclaimer-banner" style="margin-top:24px">
             <span class="disclaimer-icon">i</span>
@@ -830,6 +852,7 @@ async function renderSourcesPage() {
             <div class="data-table-header">
                 <span class="data-table-title">Cara Kami Mengumpulkan Data</span>
             </div>
+            <div class="data-table-scroll">
             <table class="data-table">
                 <thead><tr><th>Sumber</th><th>Metode</th><th>Frekuensi Update</th><th>Verifikasi</th></tr></thead>
                 <tbody>
@@ -842,6 +865,7 @@ async function renderSourcesPage() {
                     <tr><td>data.go.id (CKAN)</td><td>Public API</td><td>Per request</td><td>&#9989; Portal data terbuka resmi</td></tr>
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div class="pov-section" style="margin-top:8px">

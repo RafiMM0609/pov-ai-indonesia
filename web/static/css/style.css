@@ -517,12 +517,155 @@ body {
     box-shadow: 0 0 0 2px rgba(74, 158, 255, 0.15);
 }
 
+/* ===================== RESPONSIVE — MOBILE HAMBURGER NAV ===================== */
+.nav-toggle {
+    display: none;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    line-height: 1;
+}
+.nav-toggle:hover { border-color: var(--border-light); color: var(--text-primary); }
+
+/* ===================== RESPONSIVE — TABLET ===================== */
+@media (max-width: 900px) {
+    .sources-grid { grid-template-columns: 1fr; }
+}
+
+/* ===================== RESPONSIVE — MOBILE ===================== */
 @media (max-width: 768px) {
-    .header-inner { flex-direction: column; height: auto; padding: 12px 0; gap: 12px; }
-    .filter-bar { flex-direction: column; align-items: stretch; }
-    .filter-btn { margin-left: 0; }
-    .cards-grid { grid-template-columns: 1fr; }
-    .stat-card-value { font-size: 24px; }
+    /* Header & Nav */
+    .header { padding: 0 16px; }
+    .header-inner {
+        flex-wrap: wrap;
+        height: auto;
+        padding: 12px 0;
+        gap: 0;
+        position: relative;
+    }
+    .logo { flex: 1; }
+    .logo h1 { font-size: 15px; }
+    .logo-icon { font-size: 20px; }
+    .nav-toggle { display: block; }
+    .nav {
+        display: none;
+        flex-direction: column;
+        width: 100%;
+        gap: 2px;
+        padding: 8px 0 4px;
+        border-top: 1px solid var(--border);
+        margin-top: 10px;
+    }
+    .nav.open { display: flex; }
+    .nav-link {
+        padding: 10px 12px;
+        font-size: 14px;
+        border-radius: var(--radius);
+    }
+
+    /* Main content padding */
+    .main { padding: 20px 16px; }
+
+    /* Page title */
+    .page-title h2 { font-size: 22px; }
+    .page-title { margin-bottom: 20px; }
+
+    /* Filter bar */
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+        padding: 14px 16px;
+        margin-bottom: 20px;
+    }
+    .filter-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        width: 100%;
+    }
+    .filter-select, .filter-input { width: 100%; }
+    .filter-btn { margin-left: 0; width: 100%; padding: 10px; }
+
+    /* Cards */
+    .cards-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    .stat-card { padding: 18px; }
+    .stat-card-value { font-size: 26px; }
+
+    /* Charts */
+    .chart-container { padding: 16px; margin-bottom: 20px; }
+    .chart-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .chart-canvas { height: 220px; }
+    .tradingview-chart { height: 280px; min-height: 280px; }
+    .tradingview-widget-container { padding: 14px; }
+    .tradingview-widget-header { flex-direction: column; align-items: flex-start; gap: 6px; }
+
+    /* Tables — horizontal scroll */
+    .data-table-container { margin-bottom: 20px; }
+    .data-table-header { padding: 12px 16px; flex-wrap: wrap; gap: 6px; }
+    .data-table th, .data-table td { padding: 10px 12px; font-size: 12px; }
+    .data-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    /* POV insight section */
+    .pov-section { padding: 16px; margin-bottom: 20px; }
+    .pov-section-header {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    .pov-section-header > span:last-child {
+        margin-left: 0 !important;
+        width: 100%;
+        font-size: 10px !important;
+    }
+
+    /* Disclaimer */
+    .disclaimer-banner { flex-direction: column; gap: 8px; padding: 12px 14px; }
+    .disclaimer-icon { font-size: 14px; }
+
+    /* Sources page */
+    .sources-grid { grid-template-columns: 1fr; gap: 14px; }
+    .source-card { padding: 18px; }
+
+    /* Bias section */
+    .bias-section { padding: 18px; }
+    .bias-list li { flex-direction: row; gap: 10px; }
+
+    /* Legend bar */
+    .legend-bar { flex-direction: column; gap: 10px; }
+
+    /* Data sources summary */
+    .data-sources-summary { padding: 16px; }
+
+    /* Commodity */
+    .commodity-header { margin-bottom: 12px; }
+
+    /* Footer */
+    .footer { padding: 16px; font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+    .main { padding: 16px 12px; }
+    .header { padding: 0 12px; }
+    .logo h1 { font-size: 14px; }
+    .stat-card-value { font-size: 22px; letter-spacing: -0.5px; }
+    .page-title h2 { font-size: 20px; }
+    .filter-bar { padding: 12px; }
+    .chart-canvas { height: 180px; }
+    .tradingview-chart { height: 240px; min-height: 240px; }
+    .data-table th, .data-table td { padding: 8px 10px; font-size: 11px; }
+    .pov-section { padding: 14px; }
+    .source-card { padding: 16px; }
+    .bias-section { padding: 16px; }
+    .bias-section h3 { font-size: 14px; }
 }
 
 /* Banner shown when the requested period has no data and the backend
@@ -539,3 +682,5 @@ body {
     line-height: 1.6;
     animation: fadeIn 0.4s ease;
 }
+
+
