@@ -70,8 +70,11 @@ func (s *Server) setupRoutes(staticDir, templateDir string) {
 		api.GET("/bi-rates", s.handleBIRates)
 		api.GET("/ckan-datasets", s.handleCKANDatasets)
 		api.GET("/ojk-entities", s.handleOJKEntities)
+		// Commodity & Gold data endpoints
 		api.GET("/commodity-prices", s.handleCommodityPrices)
 		api.GET("/commodity-latest", s.handleLatestCommodityPrices)
+		api.GET("/gold-prices", s.handleGoldPrices)
+		api.GET("/gold-prices/latest", s.handleLatestGoldPrices)
 
 		// Data sources transparency endpoint
 		api.GET("/data-sources", s.handleDataSources)
@@ -82,6 +85,7 @@ func (s *Server) setupRoutes(staticDir, templateDir string) {
 	s.router.GET("/", s.handleIndex)
 	s.router.GET("/exchange-rate", s.handleExchangeRatePage)
 	s.router.GET("/fuel-price", s.handleFuelPricePage)
+	s.router.GET("/gold-price", s.handleGoldPricePage)
 	s.router.GET("/sources", s.handleSourcesPage)
 	s.router.GET("/commodities", s.handleCommoditiesPage) // SPA - same HTML, JS handles routing
 }
@@ -176,6 +180,10 @@ func (s *Server) handleDashboard(c *gin.Context) {
 
 	if fi, ok := loadInsightFor("fuel_price"); ok && len(fuel) > 0 {
 		insights = append(insights, *fi)
+	}
+
+	if gi, ok := loadInsightFor("gold_price"); ok {
+		insights = append(insights, *gi)
 	}
 
 	// Get data sources for transparency
@@ -503,6 +511,43 @@ func (s *Server) handleSourcesPage(c *gin.Context) {
 
 func (s *Server) handleCommoditiesPage(c *gin.Context) {
 	c.HTML(http.StatusOK, "index.html", gin.H{"title": "Kebutuhan Pokok - POV AI Indonesia"})
+}
+
+func (s *Server) handleGoldPricePage(c *gin.Context) {
+	c.HTML(http.StatusOK, "index.html", gin.H{"title": "Harga Emas - POV AI Indonesia"})
+}
+
+// Gold price handlers
+func (s *Server) handleGoldPrices(c *gin.Context) {
+	year, month := parseYearMonth(c)
+	region := c.Query("region")
+	prices, err := s.database.GetCommodityPrices(year, month, "Emas", region)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	trend := s.database.CalculateGoldTrend(prices, year, month)
+	c.JSON(http.StatusOK, gin.H{
+		"data":          prices,
+		"trend":         trend,
+		"resolved_year": year,
+		"resolved_month": month,
+	})
+}
+
+func (s *Server) handleLatestGoldPrices(c *gin.Context) {
+	prices, err := s.database.GetLatestCommodityPrices()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	var goldPrices []models.CommodityPrice
+	for _, p := range prices {
+		if p.Commodity == "Emas" {
+			goldPrices = append(goldPrices, p)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": goldPrices})
 }
 
 

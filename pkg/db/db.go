@@ -750,3 +750,55 @@ func round2(v float64) float64 {
 	}
 	return float64(int64(v*100-0.5)) / 100
 }
+
+func (db *DB) CalculateGoldTrend(prices []models.CommodityPrice, year, month int) models.TrendIndicator {
+	if len(prices) == 0 {
+		return models.TrendIndicator{Direction: "stable"}
+	}
+
+	var goldPrices []models.CommodityPrice
+	for _, p := range prices {
+		if p.Commodity == "Emas" && (p.Type == "Antam 1g" || p.Type == "Spot XAU/IDR") {
+			goldPrices = append(goldPrices, p)
+		}
+	}
+	if len(goldPrices) == 0 {
+		// Fallback to any Emas item
+		for _, p := range prices {
+			if p.Commodity == "Emas" {
+				goldPrices = append(goldPrices, p)
+			}
+		}
+	}
+
+	if len(goldPrices) == 0 {
+		return models.TrendIndicator{Direction: "stable"}
+	}
+
+	currentVal := goldPrices[len(goldPrices)-1].Price
+	prevVal := currentVal
+
+	if len(goldPrices) >= 2 {
+		prevVal = goldPrices[len(goldPrices)-2].Price
+	}
+
+	change := 0.0
+	if prevVal > 0 {
+		change = ((currentVal - prevVal) / prevVal) * 100
+	}
+
+	direction := "stable"
+	if currentVal > prevVal {
+		direction = "up"
+	} else if currentVal < prevVal {
+		direction = "down"
+	}
+
+	return models.TrendIndicator{
+		CurrentValue:  currentVal,
+		PreviousValue: prevVal,
+		ChangePercent: round2(change),
+		Direction:     direction,
+	}
+}
+

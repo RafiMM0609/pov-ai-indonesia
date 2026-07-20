@@ -198,6 +198,47 @@ Format JSON:
 	return &result, nil
 }
 
+func (c *Client) AnalyzeGoldPrice(dataJSON, period, macroContext string) (*LLMResponse, error) {
+	system := `Anda adalah POV AI, analis senior pasar komoditas mulia dan makroekonomi terkemuka di Indonesia. Tugas Anda adalah menganalisis pergerakan harga Emas (Antam, Pegadaian, UBS, Spot XAU/IDR) secara profesional, objektif, dan bebas dari bias atau klaim finansial spekulatif.
+
+PANDUAN ANALISIS (MENCEGAH BIAS & MENJAGA TRANSPARANSI):
+1. Penggerak Utama Pasar Emas: Jelaskan korelasi harga emas dengan:
+   - Suku Bunga Global (The Fed & BI): Suku bunga acuan yang tinggi menaikkan yield obligasi dan menekan harga emas (non-yielding asset), sebaliknya pemangkasan suku bunga meningkatkan daya tarik emas.
+   - Pergerakan Dolar AS (DXY) & Nilai Tukar USD/IDR: Emas dunia dihargai dalam USD. Pelemahan Rupiah membuat harga emas dalam Rupiah (IDR) tetap tinggi atau bahkan naik meskipun emas dunia cenderung datar.
+   - Inflasi & Hedge Nilai Mata Uang: Fungsi emas sebagai pelindung nilai (inflation hedge) terhadap penurunan daya beli mata uang fiat.
+   - Ketidakpastian Geopolitik & Safe Haven: Permintaan aset aman (safe haven) saat konflik internasional atau krisis keuangan global.
+   - Pembelian Cadangan Emas Bank Sentral: Akumulasi emas oleh Bank Sentral (PBoC, BI, dll).
+2. Pembedaan Jenis & Spread Emas: Jelaskan perbedaan harga fisik Antam/UBS dengan harga spot XAU/IDR, serta pertimbangan spread harga buyback (jual kembali).
+3. Hubungkan dengan Ekonomi Nasional: Hubungkan tren emas dengan tingkat inflasi domestik BPS dan suku bunga BI.
+4. Format Output: Anda WAJIB merespons HANYA dalam format JSON yang valid seperti contoh berikut. Jangan menyertakan teks pembuka atau penutup di luar blok JSON.
+Format JSON:
+{
+  "title": "[Judul Analisis Emas yang Informatif dan Netral]",
+  "summary": "[Ringkasan Analisis Emas dalam 2-3 kalimat]",
+  "factors": [
+    {
+      "title": "[Nama Faktor]",
+      "description": "[Penjelasan mendalam dan objektif mengenai faktor ini]"
+    }
+  ],
+  "analysis": "[Analisis detail dalam beberapa paragraf, termasuk pertimbangan investasi & spread buyback]"
+}`
+
+	user := fmt.Sprintf("Analisis pergerakan harga emas di Indonesia untuk periode %s.\n\nData Harga Emas:\n%s\n\nIndikator Makroekonomi Domestik (Konteks):\n%s\n\nBerikan analisis yang objektif dan berimbang dalam bahasa Indonesia sesuai format JSON yang ditentukan.", period, dataJSON, macroContext)
+
+	resp, err := c.ChatCompletion(system, user)
+	if err != nil {
+		return nil, err
+	}
+
+	cleaned := extractJSON(resp)
+	var result LLMResponse
+	if err := json.Unmarshal([]byte(cleaned), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse LLM JSON: %w (raw: %s)", err, resp[:min(100, len(resp))])
+	}
+	return &result, nil
+}
+
 // extractJSON tries to find a JSON object in a string (handles markdown code blocks).
 func extractJSON(s string) string {
 	// Strip markdown code blocks

@@ -34,7 +34,8 @@
     <script src="/static/js/app.js"></script>
     <script>document.addEventListener('DOMContentLoaded', () => {
         const path = window.location.pathname;
-        if (path.includes('exchange-rate')) renderExchangeRatePage();
+        if (path.includes('gold-price')) renderGoldPricePage();
+        else if (path.includes('exchange-rate')) renderExchangeRatePage();
         else if (path.includes('fuel-price')) renderFuelPricePage();
         else renderDashboard();
     });</script>

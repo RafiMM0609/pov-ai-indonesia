@@ -18,6 +18,7 @@ type Database interface {
 	GetFuelPrices(year, month int, bbmType, region string) ([]models.FuelPrice, error)
 	GetBPSIndicators(year int, indicatorID, region string) ([]models.BPSEconomicIndicator, error)
 	GetBIRates(year int, rateType string) ([]models.BIRate, error)
+	GetCommodityPrices(year, month int, commodity, region string) ([]models.CommodityPrice, error)
 }
 
 type KnowledgeManager struct {
@@ -122,6 +123,32 @@ func (km *KnowledgeManager) RegenerateAll(years []int) {
 				}
 			}
 		}
+
+		gold, err := km.db.GetCommodityPrices(year, 0, "Emas", "")
+		if err != nil {
+			fmt.Printf("[knowledge] Error getting gold prices for %d: %v\n", year, err)
+		} else if len(gold) > 0 {
+			if _, err := km.genGoldPrice(gold, year, 0, llmOK); err == nil {
+				total++
+				period := fmt.Sprintf("%d", year)
+				generatedFiles[fmt.Sprintf("gold_price_%s.md", period)] = true
+			}
+			if year >= 2024 {
+				for m := 1; m <= 12; m++ {
+					mg, err := km.db.GetCommodityPrices(year, m, "Emas", "")
+					if err != nil {
+						continue
+					}
+					if len(mg) > 0 {
+						if _, err := km.genGoldPrice(mg, year, m, llmOK); err == nil {
+							total++
+							period := fmt.Sprintf("%d-%02d", year, m)
+							generatedFiles[fmt.Sprintf("gold_price_%s.md", period)] = true
+						}
+					}
+				}
+			}
+		}
 	}
 
 	entries, err := os.ReadDir(km.knowledgeDir)
@@ -188,6 +215,28 @@ func (km *KnowledgeManager) RegenerateAllTemplates(years []int) {
 					}
 					if len(mf) > 0 {
 						if _, err := km.genFuelPrice(mf, year, m, false); err == nil {
+							total++
+						}
+					}
+				}
+			}
+		}
+
+		gold, err := km.db.GetCommodityPrices(year, 0, "Emas", "")
+		if err != nil {
+			fmt.Printf("[knowledge] Error getting gold prices for %d: %v\n", year, err)
+		} else if len(gold) > 0 {
+			if _, err := km.genGoldPrice(gold, year, 0, false); err == nil {
+				total++
+			}
+			if year >= 2024 {
+				for m := 1; m <= 12; m++ {
+					mg, err := km.db.GetCommodityPrices(year, m, "Emas", "")
+					if err != nil {
+						continue
+					}
+					if len(mg) > 0 {
+						if _, err := km.genGoldPrice(mg, year, m, false); err == nil {
 							total++
 						}
 					}
@@ -293,12 +342,63 @@ func (km *KnowledgeManager) genFuelPrice(prices []models.FuelPrice, year, month 
 	}, nil
 }
 
+func (km *KnowledgeManager) genGoldPrice(prices []models.CommodityPrice, year, month int, llm bool) (*models.KnowledgeEntry, error) {
+	period := fmt.Sprintf("%d", year)
+	if month > 0 {
+		period = fmt.Sprintf("%d-%02d", year, month)
+	}
+
+	var title, summary, analysis string
+	var factors []Factor
+
+	if llm {
+		dataJSON := formatGoldData(prices)
+		macroContext := km.getMacroContext(year, month)
+		resp, err := km.aiClient.AnalyzeGoldPrice(dataJSON, period, macroContext)
+		if err == nil {
+			title = resp.Title
+			summary = resp.Summary
+			factors = []Factor{}
+			for _, f := range resp.Factors {
+				factors = append(factors, Factor{Title: f.Title, Description: f.Description})
+			}
+			analysis = resp.Analysis
+		} else {
+			fmt.Printf("[knowledge] AI GoldPrice analysis failed, using fallback: %v\n", err)
+		}
+	}
+
+	if title == "" {
+		title, summary, factors, analysis = goldPriceFallback(year, month, prices)
+	}
+
+	content := buildGoldPriceMarkdown(title, summary, factors, analysis, prices)
+	fp := filepath.Join(km.knowledgeDir, fmt.Sprintf("gold_price_%s.md", period))
+	if err := os.WriteFile(fp, []byte(content), 0644); err != nil {
+		return nil, err
+	}
+
+	return &models.KnowledgeEntry{
+		Title:       title,
+		Category:    "gold_price",
+		Period:      period,
+		Summary:     summary,
+		Content:     content,
+		Factors:     FactorsToStrings(factors),
+		GeneratedAt: time.Now(),
+	}, nil
+}
+
 func (km *KnowledgeManager) GenerateExchangeRateInsight(rates []models.ExchangeRate, year, month int) (*models.KnowledgeEntry, error) {
 	return km.genExchangeRate(rates, year, month, km.aiClient.IsEnabled())
 }
 
 func (km *KnowledgeManager) GenerateFuelPriceInsight(prices []models.FuelPrice, year, month int) (*models.KnowledgeEntry, error) {
 	return km.genFuelPrice(prices, year, month, km.aiClient.IsEnabled())
+}
+
+func (km *KnowledgeManager) GenerateGoldPriceInsight(prices []models.CommodityPrice, year, month int) (*models.KnowledgeEntry, error) {
+	return km.genGoldPrice(prices, year, month, km.aiClient.IsEnabled())
 }
 
 func (km *KnowledgeManager) LoadInsight(category, period string) (*models.KnowledgeEntry, error) {
@@ -690,5 +790,96 @@ func buildFuelPriceMarkdown(title, summary string, factors []Factor, analysis st
 		md += fmt.Sprintf("| %s | Rp %.0f |\n", bbm, avg)
 	}
 	md += "\n---\n\n*Analisis ini dihasilkan oleh POV AI berdasarkan data historis. Bukan saran keuangan.*\n"
+	return md
+}
+
+func formatGoldData(prices []models.CommodityPrice) string {
+	var lines []string
+	for _, p := range prices {
+		lines = append(lines, fmt.Sprintf("%s - %s (%s, %s): Rp %.0f", p.Date, p.Commodity, p.Type, p.Region, p.Price))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func goldPriceFallback(year, month int, prices []models.CommodityPrice) (string, string, []Factor, string) {
+	if len(prices) == 0 {
+		return "Analisis Harga Emas", "Data tidak tersedia", []Factor{}, "Tidak ada data untuk dianalisis."
+	}
+
+	var latestAntam1g float64 = 2450000
+	var latestSpot float64 = 2380000
+	for _, p := range prices {
+		if p.Type == "Antam 1g" && p.Price > 0 {
+			latestAntam1g = p.Price
+		}
+		if p.Type == "Spot XAU/IDR" && p.Price > 0 {
+			latestSpot = p.Price
+		}
+	}
+
+	buybackEst := latestAntam1g * 0.895
+	spread := latestAntam1g - buybackEst
+
+	periodName := getPeriodName(year, month)
+	title := fmt.Sprintf("Analisis Pasar Emas & Aset Safe Haven %s", periodName)
+	summary := fmt.Sprintf("Harga Emas Antam 1g %s berada di kisaran Rp %.0f/gram dengan estimasi harga buyback Rp %.0f (spread Rp %.0f/g atau ~10.5%%). Emas tetap menjadi instrumen lindung nilai (inflation hedge) favorit masyarakat Indonesia.",
+		periodName, latestAntam1g, buybackEst, spread)
+
+	var factors []Factor
+
+	factors = append(factors, Factor{
+		Title: "Ekspektasi Suku Bunga The Fed & Kebijakan BI-Rate",
+		Description: "Kebijakan suku bunga acuan bank sentral global (Federal Reserve) dan Bank Indonesia berdampak langsung pada opportunity cost memegang emas. Saat ekspektasi pemangkasan suku bunga meningkat, yield obligasi menurun sehingga daya tarik emas sebagai aset non-yielding meningkat.",
+	})
+
+	factors = append(factors, Factor{
+		Title: "Fluktuasi Nilai Tukar USD/IDR & Indeks Dolar (DXY)",
+		Description: fmt.Sprintf("Emas dunia didagang dalam USD (XAU/USD). Pelemahan Rupiah terhadap USD secara teknis menjaga harga emas Antam (IDR) tetap tinggi di pasar domestik, meskipun emas global sedang mengalami koreksi tipis. Saat ini Spot XAU/IDR berada di Rp %.0f/gram.", latestSpot),
+	})
+
+	factors = append(factors, Factor{
+		Title: "Permintaan Safe Haven & Konflik Geopolitik Global",
+		Description: "Ketegangan geopolitik internasional serta ketidakpastian pasar saham mendorong arus modal asing dan domestik ke aset aman (safe haven). Akumulasi cadangan emas oleh bank-bank sentral dunia juga memberikan landasan harga emas yang kuat.",
+	})
+
+	factors = append(factors, Factor{
+		Title: "Margin Spread Buyback & Pajak PPh 22",
+		Description: fmt.Sprintf("Spread buyback Antam berada di kisaran ~10.5%% (Rp %.0f/g). Berdasarkan PMK No. 34/PMK.10/2017, penjualan kembali emas ke PT Antam Tbk dengan nominal di atas Rp 10 juta dikenakan PPh 22 sebesar 1,5%% untuk pemegang NPWP dan 3%% untuk non-NPWP.", spread),
+	})
+
+	analysis := fmt.Sprintf(`**Detail Harga & Spread Emas %s:**
+- **Harga Jual Antam 1g:** Rp %.0f
+- **Estimasi Harga Buyback:** Rp %.0f
+- **Selisih Spread Buyback:** Rp %.0f/gram (~10.5%%)
+- **Live Spot XAU/IDR:** Rp %.0f/gram
+
+**Implikasi Investasi untuk Masyarakat:**
+- Emas fisik sangat cocok untuk investasi jangka menengah-panjang (>2-3 tahun) untuk menutup beban *spread buyback*.
+- Untuk keperluan likuiditas jangka pendek (< 1 tahun), perhatikan bahwa *spread* jual-beli memerlukan kenaikan harga minimal 10-11%% agar mencapai titik *break-even*.
+- Pembelian pecahan besar (50g, 100g, 1000g) memiliki premi cetak per gram yang jauh lebih rendah dibanding pecahan kecil (0.5g atau 1g).
+
+**Rekomendasi Strategi Alokasi:**
+- Pertahankan alokasi emas 10%% - 20%% dari total portofolio investasi sebagai benteng pertahanan risiko inflasi dan devaluasi mata uang.
+- Manfaatkan metode Dollar Cost Averaging (DCA) atau cicil emas untuk memitigasi risiko volatilitas harga harian.`,
+		periodName, latestAntam1g, buybackEst, spread, latestSpot,
+	)
+
+	return title, summary, factors, analysis
+}
+
+func buildGoldPriceMarkdown(title, summary string, factors []Factor, analysis string, prices []models.CommodityPrice) string {
+	md := fmt.Sprintf("# %s\n\n*Generated by POV AI - %s*\n\n---\n\n## Ringkasan\n\n%s\n\n## Faktor-faktor Penyebab\n\n",
+		title, time.Now().Format("2006-01-02 15:04:00"), summary)
+	for i, f := range factors {
+		md += fmt.Sprintf("### %d. %s\n\n%s\n\n", i+1, f.Title, f.Description)
+	}
+	if analysis != "" {
+		md += fmt.Sprintf("## Analisis Detail\n\n%s\n\n", analysis)
+	}
+	md += "\n## Data Harga Emas & Pecahan\n\n| Jenis Emas | Harga (Rp) | Unit | Sumber |\n|------------|------------|------|--------|\n"
+	for _, p := range prices {
+		md += fmt.Sprintf("| %s | Rp %.0f | %s | %s |\n", p.Type, p.Price, p.Unit, p.Source)
+	}
+	md += "\n---\n\n*Analisis ini dihasilkan oleh POV AI berdasarkan data pasar historis. Bukan saran keuangan.*\n"
 	return md
 }

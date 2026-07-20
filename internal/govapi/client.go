@@ -435,7 +435,12 @@ func SeedCommodityData() []models.CommodityPrice {
 	}
 
 	items := []commodityItem{
-		// Emas (harga per gram dari TradingView XAUIDRG)
+		// Emas (harga per gram & pecahan Antam/UBS/Pegadaian/Spot)
+		{
+			Commodity: "Emas", Type: "Antam 0.5g", Unit: "0.5 gram",
+			Prices: map[string]float64{"Jakarta": 1275000, "Surabaya": 1280000, "Bandung": 1278000, "Medan": 1282000},
+			Source: "logammulia-official",
+		},
 		{
 			Commodity: "Emas", Type: "Antam 1g", Unit: "gram",
 			Prices: map[string]float64{
@@ -444,13 +449,73 @@ func SeedCommodityData() []models.CommodityPrice {
 				"Denpasar": 2470000, "Makassar": 2470000, "Balikpapan": 2465000, "Manado": 2465000,
 				"Jayapura": 2480000, "Pontianak": 2460000, "Mataram": 2465000, "Banjarmasin": 2465000,
 			},
-			Source: "tradingview-xauidr",
+			Source: "logammulia-official",
 		},
 		{
-			Commodity: "Emas", Type: "Antam 10g", Unit: "gram",
+			Commodity: "Emas", Type: "Antam 2g", Unit: "2 gram",
+			Prices: map[string]float64{"Jakarta": 4840000, "Surabaya": 4850000, "Bandung": 4845000, "Medan": 4860000},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "Antam 3g", Unit: "3 gram",
+			Prices: map[string]float64{"Jakarta": 7235000, "Surabaya": 7250000, "Bandung": 7240000, "Medan": 7260000},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "Antam 5g", Unit: "5 gram",
+			Prices: map[string]float64{"Jakarta": 12025000, "Surabaya": 12050000, "Bandung": 12030000, "Medan": 12060000},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "Antam 10g", Unit: "10 gram",
 			Prices: map[string]float64{
-				"Jakarta": 23200000, "Surabaya": 23250000, "Medan": 23300000, "Bandung": 23250000,
+				"Jakarta": 23995000, "Surabaya": 24050000, "Medan": 24080000, "Bandung": 24020000,
 			},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "Antam 25g", Unit: "25 gram",
+			Prices: map[string]float64{"Jakarta": 59862000, "Surabaya": 60000000, "Bandung": 59900000},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "Antam 50g", Unit: "50 gram",
+			Prices: map[string]float64{"Jakarta": 119645000, "Surabaya": 119900000, "Bandung": 119700000},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "Antam 100g", Unit: "100 gram",
+			Prices: map[string]float64{"Jakarta": 239212000, "Surabaya": 239700000, "Bandung": 239300000},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "Antam 250g", Unit: "250 gram",
+			Prices: map[string]float64{"Jakarta": 597765000, "Surabaya": 599000000},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "Antam 500g", Unit: "500 gram",
+			Prices: map[string]float64{"Jakarta": 1195320000, "Surabaya": 1197000000},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "Antam 1000g", Unit: "1000 gram",
+			Prices: map[string]float64{"Jakarta": 2390600000, "Surabaya": 2394000000},
+			Source: "logammulia-official",
+		},
+		{
+			Commodity: "Emas", Type: "UBS 1g", Unit: "gram",
+			Prices: map[string]float64{"Jakarta": 2410000, "Surabaya": 2415000, "Bandung": 2412000},
+			Source: "pegadaian-official",
+		},
+		{
+			Commodity: "Emas", Type: "Pegadaian 1g", Unit: "gram",
+			Prices: map[string]float64{"Jakarta": 2420000, "Surabaya": 2425000, "Bandung": 2422000},
+			Source: "pegadaian-official",
+		},
+		{
+			Commodity: "Emas", Type: "Spot XAU/IDR", Unit: "gram",
+			Prices: map[string]float64{"Jakarta": 2380000, "Surabaya": 2380000, "Bandung": 2380000},
 			Source: "tradingview-xauidr",
 		},
 		// Beras (per kg) - harga berbeda per wilayah

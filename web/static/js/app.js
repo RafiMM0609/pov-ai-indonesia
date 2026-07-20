@@ -14,7 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function navigateTo(path) {
-    if (path.includes('exchange-rate')) {
+    if (path.includes('gold-price')) {
+        setActiveNav('gold');
+        document.title = "Harga Emas - POV AI Indonesia";
+        renderGoldPricePage();
+    } else if (path.includes('exchange-rate')) {
         setActiveNav('exchange');
         document.title = "USD/IDR - POV AI Indonesia";
         renderExchangeRatePage();
@@ -54,7 +58,7 @@ function setupNavigation() {
             navToggle.innerHTML = isOpen ? '&#10005;' : '&#8801;';
         });
     }
- 
+
     document.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -63,7 +67,8 @@ function setupNavigation() {
             if (navToggle) { navToggle.setAttribute('aria-expanded', false); navToggle.innerHTML = '&#8801;'; }
             const page = link.dataset.page;
             let path = '/';
-            if (page === 'exchange') path = '/exchange-rate';
+            if (page === 'gold') path = '/gold-price';
+            else if (page === 'exchange') path = '/exchange-rate';
             else if (page === 'fuel') path = '/fuel-price';
             else if (page === 'commodities') path = '/commodities';
             else if (page === 'sources') path = '/sources';
@@ -536,7 +541,256 @@ async function renderFuelPricePage() {
     });
 }
 
-// ===================== COMMODITIES PAGE =====================
+// ===================== GOLD PRICE PAGE =====================
+
+async function renderGoldPricePage() {
+    const main = document.getElementById('main-content');
+    main.innerHTML = buildDisclaimerHTML() + '<div class="loading">Memuat data harga emas</div>';
+
+    const params = new URLSearchParams();
+    if (currentYear) params.set('year', currentYear);
+    if (currentMonth) params.set('month', currentMonth);
+
+    const data = await fetchAPI(`/gold-prices?${params}`);
+    const resolvedYear = data && data.resolved_year ? data.resolved_year : currentYear;
+    const resolvedMonth = data && data.resolved_month ? data.resolved_month : currentMonth;
+    const latest = await fetchAPI('/gold-prices/latest');
+    const insight = await fetchAPI(`/insights/gold_price/${resolvedYear}${resolvedMonth ? '-'+String(resolvedMonth).padStart(2,'0') : ''}`);
+
+    if (!data || !data.data) {
+        main.innerHTML = '<div class="error-msg">Gagal memuat data harga emas.</div>';
+        return;
+    }
+
+    const prices = data.data;
+    const trend = data.trend;
+
+    // Latest price per type
+    const latestByType = {};
+    if (latest && latest.data) {
+        latest.data.forEach(p => { latestByType[p.type] = p; });
+    }
+    prices.forEach(p => {
+        if (!latestByType[p.type] || p.date > latestByType[p.type].date) {
+            latestByType[p.type] = p;
+        }
+    });
+
+    let antam1gPrice = 2450000;
+    if (latestByType['Antam 1g']) antam1gPrice = latestByType['Antam 1g'].price;
+    else if (latestByType['Antam 10g']) antam1gPrice = latestByType['Antam 10g'].price / 10;
+
+    let spotPrice = 2380000;
+    if (latestByType['Spot XAU/IDR']) spotPrice = latestByType['Spot XAU/IDR'].price;
+
+    const buybackEst = antam1gPrice * 0.895;
+    const spreadEst = antam1gPrice - buybackEst;
+
+    let html = `
+        <div class="page-title">
+            <h2>Harga Emas Indonesia &amp; Safe Haven Insight</h2>
+            <p>Pergerakan harga Emas Antam, UBS, Pegadaian, Spot XAU/IDR, dan Analisis AI</p>
+        </div>
+        <div class="filter-bar">
+            <div class="filter-group"><label>Tahun</label>
+                <select class="filter-select" id="filter-year"><option value="0">Semua</option>
+                    ${[2020,2021,2022,2023,2024,2025,2026].map(y => `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`).join('')}
+                </select>
+            </div>
+            <div class="filter-group"><label>Bulan</label>
+                <select class="filter-select" id="filter-month"><option value="0">Semua</option>
+                    ${['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'].map((m,i) => `<option value="${i+1}" ${i+1 === currentMonth ? 'selected' : ''}>${m}</option>`).join('')}
+                </select>
+            </div>
+            <button class="filter-btn" id="btn-apply-filter">Terapkan Filter</button>
+        </div>
+        <div class="cards-grid">
+            <div class="stat-card gold-card">
+                <div class="stat-card-header">
+                    <span class="stat-card-label">Antam 1 Gram</span>
+                    <span class="stat-card-badge badge-${trend.direction}">${trend.direction === 'up' ? 'Naik' : trend.direction === 'down' ? 'Turun' : 'Stabil'}</span>
+                </div>
+                <div class="stat-card-value" style="color:#ffd700">Rp ${fmt(antam1gPrice)}</div>
+                <div class="stat-card-sub">Harga jual resmi per gram</div>
+                <div class="stat-card-change change-${trend.direction}">
+                    ${trend.direction === 'up' ? '&#9650;' : trend.direction === 'down' ? '&#9660;' : '&#9644;'}
+                    ${Math.abs(trend.change_percent).toFixed(2)}% vs sebelumnya
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header"><span class="stat-card-label">Buyback (Estimasi)</span></div>
+                <div class="stat-card-value">Rp ${fmt(buybackEst)}</div>
+                <div class="stat-card-sub">Harga beli kembali (~89.5%)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header"><span class="stat-card-label">Spot XAU/IDR</span></div>
+                <div class="stat-card-value">Rp ${fmt(spotPrice)}</div>
+                <div class="stat-card-sub">Harga spot dunia per gram</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-card-header"><span class="stat-card-label">Spread Buyback</span></div>
+                <div class="stat-card-value" style="font-size:20px;color:var(--text-muted)">Rp ${fmt(spreadEst)}</div>
+                <div class="stat-card-sub">Selisih jual-beli (~10.5%)</div>
+            </div>
+        </div>
+
+        <div class="tradingview-widget-container" style="margin-top:24px">
+            <div class="tradingview-widget-header">
+                <span class="tradingview-title">&#128200; Live Gold Price Widget (XAU/IDR per gram)</span>
+                <a href="https://id.tradingview.com/symbols/XAUIDRG/" target="_blank" rel="noopener" class="tradingview-link">Buka di TradingView &rarr;</a>
+            </div>
+            <div id="tradingview-gold-page-chart" class="tradingview-chart"></div>
+        </div>
+
+        <div class="chart-container" style="margin-top:24px">
+            <div class="chart-header">
+                <span class="chart-title">Grafik Historis Harga Emas</span>
+            </div>
+            <div id="gold-detail-chart" class="chart-canvas"></div>
+        </div>
+    `;
+
+    // Grammage breakdown table (0.5g up to 1000g)
+    const grammages = [
+        { label: '0.5 gram', weight: 0.5, key: 'Antam 0.5g' },
+        { label: '1 gram', weight: 1, key: 'Antam 1g' },
+        { label: '2 gram', weight: 2, key: 'Antam 2g' },
+        { label: '3 gram', weight: 3, key: 'Antam 3g' },
+        { label: '5 gram', weight: 5, key: 'Antam 5g' },
+        { label: '10 gram', weight: 10, key: 'Antam 10g' },
+        { label: '25 gram', weight: 25, key: 'Antam 25g' },
+        { label: '50 gram', weight: 50, key: 'Antam 50g' },
+        { label: '100 gram', weight: 100, key: 'Antam 100g' },
+        { label: '250 gram', weight: 250, key: 'Antam 250g' },
+        { label: '500 gram', weight: 500, key: 'Antam 500g' },
+        { label: '1000 gram', weight: 1000, key: 'Antam 1000g' },
+    ];
+
+    html += `
+        <div class="data-table-container" style="margin-top:24px">
+            <div class="data-table-header">
+                <span class="data-table-title">&#127942; Tabel Pecahan Emas Batangan Antam</span>
+                <span style="color:var(--text-muted);font-size:12px">Resmi Logam Mulia</span>
+            </div>
+            <div class="data-table-scroll">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Pecahan</th>
+                            <th>Harga Total (Rp)</th>
+                            <th>Harga per Gram (Rp)</th>
+                            <th>Estimasi Buyback (Rp)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${grammages.map(g => {
+                            let totalPrice = 0;
+                            if (latestByType[g.key]) {
+                                totalPrice = latestByType[g.key].price;
+                            } else {
+                                totalPrice = antam1gPrice * g.weight;
+                            }
+                            const pricePerG = totalPrice / g.weight;
+                            const buybackG = totalPrice * 0.895;
+                            return `
+                                <tr>
+                                    <td><strong>${g.label}</strong></td>
+                                    <td style="color:#ffd700">Rp ${fmt(totalPrice)}</td>
+                                    <td>Rp ${fmt(pricePerG)}</td>
+                                    <td>Rp ${fmt(buybackG)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // Brand comparison (Antam vs UBS vs Pegadaian vs Spot)
+    html += `
+        <div class="commodity-section" style="margin-top:24px">
+            <div class="commodity-header">
+                <h3>Perbandingan Brand &amp; Spot Emas 1 Gram</h3>
+            </div>
+            <div class="cards-grid">
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Antam 1g</span><span class="stat-card-source">Logam Mulia</span></div>
+                    <div class="stat-card-value">Rp ${fmt(latestByType['Antam 1g'] ? latestByType['Antam 1g'].price : 2450000)}</div>
+                    <div class="stat-card-sub">Kemasan CertiCard LBMA</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">UBS 1g</span><span class="stat-card-source">Pegadaian</span></div>
+                    <div class="stat-card-value">Rp ${fmt(latestByType['UBS 1g'] ? latestByType['UBS 1g'].price : 2410000)}</div>
+                    <div class="stat-card-sub">PT Untung Bersama Sejahtera</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Pegadaian 1g</span><span class="stat-card-source">Pegadaian</span></div>
+                    <div class="stat-card-value">Rp ${fmt(latestByType['Pegadaian 1g'] ? latestByType['Pegadaian 1g'].price : 2420000)}</div>
+                    <div class="stat-card-sub">Emas Tabungan Pegadaian</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card-header"><span class="stat-card-label">Spot XAU/IDR</span><span class="stat-card-source">TradingView</span></div>
+                    <div class="stat-card-value">Rp ${fmt(latestByType['Spot XAU/IDR'] ? latestByType['Spot XAU/IDR'].price : 2380000)}</div>
+                    <div class="stat-card-sub">Pasar Emas Dunia per Gram</div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    if (insight) html += buildInsightHTML(insight);
+
+    main.innerHTML = buildDisclaimerHTML() + html;
+    setupFilterEvents();
+
+    requestAnimationFrame(() => {
+        // Line chart
+        const goldByDate = {};
+        prices.forEach(p => {
+            if (p.Type === 'Antam 1g' || p.Type === 'Spot XAU/IDR') {
+                if (!goldByDate[p.date]) goldByDate[p.date] = [];
+                goldByDate[p.date].push(p.price);
+            }
+        });
+        const goldAvg = Object.entries(goldByDate).map(([date, prs]) => ({
+            date, value: prs.reduce((a,b) => a+b, 0) / prs.length
+        })).sort((a,b) => a.date.localeCompare(b.date));
+
+        if (goldAvg.length > 0) {
+            drawLineChart('gold-detail-chart', goldAvg, '#ffd700');
+        } else if (prices.length > 0) {
+            drawLineChart('gold-detail-chart', prices.map(p => ({date: p.date, value: p.price})), '#ffd700');
+        }
+
+        // TradingView Widget
+        loadTradingViewWidgetForPage('tradingview-gold-page-chart');
+    });
+}
+
+function loadTradingViewWidgetForPage(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const script = document.createElement('script');
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-mini-symbol-overview.js';
+    script.async = true;
+    script.innerHTML = JSON.stringify({
+        "symbol": "FX_IDC:XAUIDRG",
+        "width": "100%",
+        "height": "400",
+        "locale": "id",
+        "dateRange": "1M",
+        "colorTheme": "dark",
+        "isTransparent": true,
+        "autosize": false,
+        "largeChartUrl": "https://id.tradingview.com/symbols/XAUIDRG/",
+        "noTimeScale": false,
+        "chartOnly": false
+    });
+
+    container.innerHTML = '';
+    container.appendChild(script);
+}
 
 let currentWilayah = 'Jakarta';
 

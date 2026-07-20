@@ -23,20 +23,25 @@
                 </div>
                 <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">&#8801;</button>
                 <nav class="nav" id="main-nav">
-                    <a href="/" class="nav-link active" data-page="dashboard">Dashboard</a>
+                    <a href="/" class="nav-link" data-page="dashboard">Dashboard</a>
                     <a href="/exchange-rate" class="nav-link" data-page="exchange">USD/IDR</a>
                     <a href="/fuel-price" class="nav-link" data-page="fuel">Harga BBM</a>
-                    <a href="/gold-price" class="nav-link" data-page="gold">Harga Emas</a>
+                    <a href="/gold-price" class="nav-link active" data-page="gold">Harga Emas</a>
                     <a href="/commodities" class="nav-link" data-page="commodities">Kebutuhan Pokok</a>
                     <a href="/sources" class="nav-link" data-page="sources">Sumber Data</a>
                 </nav>
             </div>
         </header>
-        <main class="main" id="main-content"></main>
-        <footer class="footer">
-            <p>POV AI Indonesia &mdash; AI-powered economic insight platform</p>
-        </footer>
+        <main class="main" id="main-content"><div class="loading">Memuat data harga emas</div></main>
+        <footer class="footer"><p>POV AI Indonesia &mdash; AI-powered economic insight platform</p></footer>
     </div>
     <script src="/static/js/app.js"></script>
+    <script>document.addEventListener('DOMContentLoaded', () => {
+        const path = window.location.pathname;
+        if (path.includes('gold-price')) renderGoldPricePage();
+        else if (path.includes('exchange-rate')) renderExchangeRatePage();
+        else if (path.includes('fuel-price')) renderFuelPricePage();
+        else renderDashboard();
+    });</script>
 </body>
 </html>
