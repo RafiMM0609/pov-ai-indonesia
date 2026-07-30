@@ -239,30 +239,49 @@ Format JSON:
 	return &result, nil
 }
 
-// extractJSON tries to find a JSON object in a string (handles markdown code blocks).
+// extractJSON tries to find a JSON object in a string (handles thinking tokens and markdown code blocks).
 func extractJSON(s string) string {
-	// Strip markdown code blocks
-	if idx := strings.Index(s, "```json"); idx >= 0 {
-		s = s[idx+7:]
-		if end := strings.Index(s, "```"); end >= 0 {
-			s = s[:end]
+	// Strip <think> ... </think> blocks if present (common in reasoning models)
+	for {
+		start := strings.Index(s, "<think>")
+		if start == -1 {
+			break
 		}
-		return strings.TrimSpace(s)
+		end := strings.Index(s, "</think>")
+		if end != -1 && end > start {
+			s = s[:start] + s[end+8:]
+		} else {
+			// unterminated <think>, discard up to end if found or start
+			if end != -1 {
+				s = s[end+8:]
+			} else {
+				s = s[:start]
+			}
+			break
+		}
+	}
+
+	// Strip markdown code blocks ```json ... ```
+	if idx := strings.Index(s, "```json"); idx >= 0 {
+		sub := s[idx+7:]
+		if end := strings.Index(sub, "```"); end >= 0 {
+			return strings.TrimSpace(sub[:end])
+		}
 	}
 	if idx := strings.Index(s, "```"); idx >= 0 {
-		s = s[idx+3:]
-		if end := strings.Index(s, "```"); end >= 0 {
-			s = s[:end]
+		sub := s[idx+3:]
+		if end := strings.Index(sub, "```"); end >= 0 {
+			return strings.TrimSpace(sub[:end])
 		}
-		return strings.TrimSpace(s)
 	}
+
 	// Find first { to last }
 	if idx := strings.Index(s, "{"); idx >= 0 {
 		if end := strings.LastIndex(s, "}"); end >= idx {
-			return s[idx : end+1]
+			return strings.TrimSpace(s[idx : end+1])
 		}
 	}
-	return s
+	return strings.TrimSpace(s)
 }
 
 func min(a, b int) int {

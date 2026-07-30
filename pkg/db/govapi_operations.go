@@ -74,7 +74,7 @@ func (db *DB) GetBPSIndicators(year int, indicatorID, region string) ([]models.B
 	}
 	defer rows.Close()
 
-	var indicators []models.BPSEconomicIndicator
+	indicators := make([]models.BPSEconomicIndicator, 0, 50)
 	for rows.Next() {
 		var i models.BPSEconomicIndicator
 		var createdAt string
@@ -104,7 +104,7 @@ func (db *DB) GetLatestBPSIndicators(indicatorID, region string) ([]models.BPSEc
 	}
 	defer rows.Close()
 
-	var indicators []models.BPSEconomicIndicator
+	indicators := make([]models.BPSEconomicIndicator, 0, 10)
 	for rows.Next() {
 		var i models.BPSEconomicIndicator
 		var createdAt string
@@ -124,7 +124,7 @@ func (db *DB) GetBPSIndicatorYears() ([]int, error) {
 	}
 	defer rows.Close()
 
-	var years []int
+	years := make([]int, 0, 10)
 	for rows.Next() {
 		var y int
 		if err := rows.Scan(&y); err != nil {
@@ -197,7 +197,7 @@ func (db *DB) GetBIRates(year int, rateType string) ([]models.BIRate, error) {
 	}
 	defer rows.Close()
 
-	var rates []models.BIRate
+	rates := make([]models.BIRate, 0, 20)
 	for rows.Next() {
 		var r models.BIRate
 		var createdAt string
@@ -226,7 +226,7 @@ func (db *DB) GetLatestBIRates() ([]models.BIRate, error) {
 	}
 	defer rows.Close()
 
-	var rates []models.BIRate
+	rates := make([]models.BIRate, 0, 10)
 	for rows.Next() {
 		var r models.BIRate
 		var createdAt string
@@ -320,7 +320,7 @@ func (db *DB) GetCKANDatasets(organization string, limit int) ([]models.CKANData
 	}
 	defer rows.Close()
 
-	var datasets []models.CKANDataset
+	datasets := make([]models.CKANDataset, 0, limit)
 	for rows.Next() {
 		var d models.CKANDataset
 		var tagsJSON, createdAt, updatedAt string
@@ -411,7 +411,7 @@ func (db *DB) GetOJKEntities(entityType, status string, limit int) ([]models.OJK
 	}
 	defer rows.Close()
 
-	var entities []models.OJKEntity
+	entities := make([]models.OJKEntity, 0, limit)
 	for rows.Next() {
 		var e models.OJKEntity
 		var createdAt string
@@ -494,7 +494,7 @@ func (db *DB) GetCommodityPrices(year, month int, commodity, region string) ([]m
 	}
 	defer rows.Close()
 
-	var prices []models.CommodityPrice
+	prices := make([]models.CommodityPrice, 0, 50)
 	for rows.Next() {
 		var c models.CommodityPrice
 		var createdAt string
@@ -523,7 +523,7 @@ func (db *DB) GetLatestCommodityPrices() ([]models.CommodityPrice, error) {
 	}
 	defer rows.Close()
 
-	var prices []models.CommodityPrice
+	prices := make([]models.CommodityPrice, 0, 20)
 	for rows.Next() {
 		var c models.CommodityPrice
 		var createdAt string
@@ -543,7 +543,7 @@ func (db *DB) GetCommodityTypes() ([]string, error) {
 	}
 	defer rows.Close()
 
-	var types []string
+	types := make([]string, 0, 10)
 	for rows.Next() {
 		var t string
 		if err := rows.Scan(&t); err != nil {

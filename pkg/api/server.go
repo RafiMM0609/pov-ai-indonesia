@@ -156,7 +156,7 @@ func (s *Server) handleDashboard(c *gin.Context) {
 	fuelTrend := s.database.CalculateFuelTrend(fuel, resolvedYear, resolvedMonth, "", "Indonesia")
 
 	// Read pre-generated insights from disk - NO LLM calls
-	var insights []models.KnowledgeEntry
+	insights := make([]models.KnowledgeEntry, 0, 3)
 
 	// Try insight for the (possibly fallback) period first, then fall back to the
 	// year-level insight so a missing month-specific insight still shows something.
@@ -451,14 +451,14 @@ func getAllYearsSafe(database *db.DB) []int {
 	if err != nil {
 		fmt.Printf("[api] Error getting fuel price years: %v\n", err)
 	}
-	yearSet := make(map[int]bool)
+	yearSet := make(map[int]bool, len(erYears)+len(fpYears))
 	for _, y := range erYears {
 		yearSet[y] = true
 	}
 	for _, y := range fpYears {
 		yearSet[y] = true
 	}
-	var years []int
+	years := make([]int, 0, len(yearSet))
 	for y := range yearSet {
 		years = append(years, y)
 	}
@@ -541,7 +541,7 @@ func (s *Server) handleLatestGoldPrices(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	var goldPrices []models.CommodityPrice
+	goldPrices := make([]models.CommodityPrice, 0, len(prices))
 	for _, p := range prices {
 		if p.Commodity == "Emas" {
 			goldPrices = append(goldPrices, p)

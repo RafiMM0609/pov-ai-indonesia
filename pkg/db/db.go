@@ -245,7 +245,7 @@ func (db *DB) GetExchangeRates(year, month int) ([]models.ExchangeRate, error) {
 	}
 	defer rows.Close()
 
-	var rates []models.ExchangeRate
+	rates := make([]models.ExchangeRate, 0, 365)
 	for rows.Next() {
 		var r models.ExchangeRate
 		var createdAt string
@@ -279,7 +279,7 @@ func (db *DB) GetExchangeRateYears() ([]int, error) {
 	}
 	defer rows.Close()
 
-	var years []int
+	years := make([]int, 0, 10)
 	for rows.Next() {
 		var y int
 		if err := rows.Scan(&y); err != nil {
@@ -366,7 +366,7 @@ func (db *DB) GetFuelPrices(year, month int, bbmType, region string) ([]models.F
 	}
 	defer rows.Close()
 
-	var prices []models.FuelPrice
+	prices := make([]models.FuelPrice, 0, 100)
 	for rows.Next() {
 		var p models.FuelPrice
 		var createdAt string
@@ -395,7 +395,7 @@ func (db *DB) GetLatestFuelPrices() ([]models.FuelPrice, error) {
 	}
 	defer rows.Close()
 
-	var prices []models.FuelPrice
+	prices := make([]models.FuelPrice, 0, 10)
 	for rows.Next() {
 		var p models.FuelPrice
 		var createdAt string
@@ -415,7 +415,7 @@ func (db *DB) GetFuelPriceYears() ([]int, error) {
 	}
 	defer rows.Close()
 
-	var years []int
+	years := make([]int, 0, 10)
 	for rows.Next() {
 		var y int
 		if err := rows.Scan(&y); err != nil {
@@ -433,7 +433,7 @@ func (db *DB) GetFuelTypes() ([]string, error) {
 	}
 	defer rows.Close()
 
-	var types []string
+	types := make([]string, 0, 10)
 	for rows.Next() {
 		var t string
 		if err := rows.Scan(&t); err != nil {
@@ -451,7 +451,7 @@ func (db *DB) GetFuelRegions() ([]string, error) {
 	}
 	defer rows.Close()
 
-	var regions []string
+	regions := make([]string, 0, 10)
 	for rows.Next() {
 		var r string
 		if err := rows.Scan(&r); err != nil {
@@ -505,7 +505,7 @@ func (db *DB) GetFuelPriceHistory(bbmType, region string, limit int) ([]models.F
 	}
 	defer rows.Close()
 
-	var prices []models.FuelPrice
+	prices := make([]models.FuelPrice, 0, limit)
 	for rows.Next() {
 		var p models.FuelPrice
 		var createdAt string
@@ -541,7 +541,7 @@ func (db *DB) GetRecentScrapeLogs(limit int) ([]map[string]interface{}, error) {
 	}
 	defer rows.Close()
 
-	var logs []map[string]interface{}
+	logs := make([]map[string]interface{}, 0, limit)
 	for rows.Next() {
 		var source, status, errMsg, createdAt string
 		var records int
@@ -643,7 +643,7 @@ func (db *DB) CalculateFuelTrend(prices []models.FuelPrice, year, month int, bbm
 		calcBBMType = "Pertalite"
 	}
 
-	var filtered []models.FuelPrice
+	filtered := make([]models.FuelPrice, 0, len(prices))
 	for _, p := range prices {
 		if p.BBMType == calcBBMType {
 			filtered = append(filtered, p)
@@ -756,7 +756,7 @@ func (db *DB) CalculateGoldTrend(prices []models.CommodityPrice, year, month int
 		return models.TrendIndicator{Direction: "stable"}
 	}
 
-	var goldPrices []models.CommodityPrice
+	goldPrices := make([]models.CommodityPrice, 0, len(prices))
 	for _, p := range prices {
 		if p.Commodity == "Emas" && (p.Type == "Antam 1g" || p.Type == "Spot XAU/IDR") {
 			goldPrices = append(goldPrices, p)
