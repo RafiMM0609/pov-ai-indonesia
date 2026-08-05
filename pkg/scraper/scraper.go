@@ -15,17 +15,20 @@ import (
 )
 
 type Scraper struct {
-	httpClient           *http.Client
-	officialPrices       map[string]float64
-	frankfurterBaseURL   string
-	frankfurterStartDate string
-	searchEnabled        bool
-	searchTimeout        int
-	searchEngineURL      string
-	searchDomainFilter   []string
+	httpClient            *http.Client
+	officialPrices        map[string]float64
+	frankfurterBaseURL    string
+	frankfurterStartDate  string
+	searchEnabled         bool
+	searchTimeout         int
+	searchEngineURL       string
+	searchDomainFilter    []string
+	pertaminaDirectURL    string
+	pertaminaDirectToken  string
+	pertaminaDirectRegion string
 }
 
-func New(officialPrices map[string]float64, startDate string, httpTimeout int, frankfurterBaseURL string, searchTimeout int, searchEngineURL, searchDomainFilter string) *Scraper {
+func New(officialPrices map[string]float64, startDate string, httpTimeout int, frankfurterBaseURL string, searchTimeout int, searchEngineURL, searchDomainFilter string, pertaminaDirectURL, pertaminaDirectToken, pertaminaDirectRegion string) *Scraper {
 	if startDate == "" {
 		startDate = "2020-01-01"
 	}
@@ -48,14 +51,17 @@ func New(officialPrices map[string]float64, startDate string, httpTimeout int, f
 		domainFilter = []string{"bisnis.com", "cnbcindonesia.com"}
 	}
 	return &Scraper{
-		httpClient:           &http.Client{Timeout: time.Duration(httpTimeout) * time.Second},
-		officialPrices:       officialPrices,
-		frankfurterBaseURL:   frankfurterBaseURL,
-		frankfurterStartDate: startDate,
-		searchEnabled:        true,
-		searchTimeout:        searchTimeout,
-		searchEngineURL:      searchEngineURL,
-		searchDomainFilter:   domainFilter,
+		httpClient:            &http.Client{Timeout: time.Duration(httpTimeout) * time.Second},
+		officialPrices:        officialPrices,
+		frankfurterBaseURL:    frankfurterBaseURL,
+		frankfurterStartDate:  startDate,
+		searchEnabled:         true,
+		searchTimeout:         searchTimeout,
+		searchEngineURL:       searchEngineURL,
+		searchDomainFilter:    domainFilter,
+		pertaminaDirectURL:    pertaminaDirectURL,
+		pertaminaDirectToken:  pertaminaDirectToken,
+		pertaminaDirectRegion: pertaminaDirectRegion,
 	}
 }
 
@@ -110,15 +116,29 @@ func (s *Scraper) ScrapeExchangeRates() ([]models.ExchangeRate, error) {
 // ===================== FUEL PRICES =====================
 
 func (s *Scraper) ScrapeFuelPrices() ([]models.FuelPrice, error) {
+	// Get region from config if available (default: Yogyakarta)
+	region := s.pertaminaDirectRegion
+	if region == "" {
+		region = "Yogyakarta"
+	}
+
 	now := time.Now()
-	today := now.Format("2006-01-02")
+	date := now.Format("2006-01-02")
 	year := now.Year()
 	month := int(now.Month())
 	day := now.Day()
 
+	// Try direct Pertamina Patra Niaga API source first
+	if s.pertaminaDirectURL != "" {
+		prices := s.pertaminaDirectPrices(date, year, month, day, region)
+		if len(prices) > 0 {
+			return prices, nil
+		}
+	}
+
 	// Always use official Pertamina prices as the primary source
 	// Web scraping is supplementary and often returns stale data
-	prices := s.pertaminaOfficialPrices(today, year, month, day)
+	prices := s.pertaminaOfficialPrices(date, year, month, day, region)
 	if len(prices) > 0 {
 		return prices, nil
 	}
@@ -127,7 +147,7 @@ func (s *Scraper) ScrapeFuelPrices() ([]models.FuelPrice, error) {
 	prices, err := s.scrapeFromWeb()
 	if err == nil && len(prices) > 0 {
 		for i := range prices {
-			prices[i].Date = today
+			prices[i].Date = date
 			prices[i].Year = year
 			prices[i].Month = month
 			prices[i].Day = day
@@ -295,10 +315,180 @@ func parsePrice(s string) (float64, error) {
 	return strconv.ParseFloat(s, 64)
 }
 
-// ===================== OFFICIAL PERTAMINA PRICES =====================
+func extractBBMTypeFromName(name string) string {
+	n := strings.ToLower(name)
+	if strings.Contains(n, "pertalite") {
+		return "Pertalite"
+	} else if strings.Contains(n, "solar") || strings.Contains(n, "bio solar") {
+		return "Solar"
+	} else if strings.Contains(n, "pertamax") {
+		return "Pertamax"
+	} else if strings.Contains(n, "dexlite") {
+		return "Dexlite"
+	} else if strings.Contains(n, "dex") || strings.Contains(n, "pertamina dex") {
+		return "Pertamina Dex"
+	}
+	return ""
+}
 
-func (s *Scraper) pertaminaOfficialPrices(date string, year, month, day int) []models.FuelPrice {
+func (s *Scraper) pertaminaDirectPrices(date string, year, month, day int, region string) []models.FuelPrice {
+	if s.pertaminaDirectURL == "" {
+		return nil
+	}
+
+	apiURL := s.pertaminaDirectURL
+	if strings.Contains(apiURL, "pertaminapatraniaga.com/page/") {
+		slug := apiURL[strings.LastIndex(apiURL, "/")+1:]
+		apiURL = fmt.Sprintf("https://pertaminapatraniaga.com/api/api/v1/post/get-by-slug/page/%s", slug)
+	}
+
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil || resp.StatusCode != 200 {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return nil
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil
+	}
+
+	return parsePertaminaPatraNiagaJSON(body, date, year, month, day, region)
+}
+
+func parsePertaminaPatraNiagaJSON(jsonData []byte, date string, year, month, day int, targetRegion string) []models.FuelPrice {
+	var respData struct {
+		Data struct {
+			Content map[string]struct {
+				DisplayName string `json:"displayName"`
+				Type        struct {
+					ResolvedName string `json:"resolvedName"`
+				} `json:"type"`
+				Props struct {
+					Items []struct {
+						Title string                   `json:"title"`
+						Data  []map[string]interface{} `json:"data"`
+					} `json:"items"`
+				} `json:"props"`
+			} `json:"content"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(jsonData, &respData); err != nil {
+		return nil
+	}
+
+	if targetRegion == "" {
+		targetRegion = "Yogyakarta"
+	}
+	targetLower := strings.ToLower(targetRegion)
+
 	var prices []models.FuelPrice
+	seenBBM := make(map[string]bool)
+
+	for _, node := range respData.Data.Content {
+		if node.DisplayName != "ProductTable" && node.Type.ResolvedName != "ProductTable" {
+			continue
+		}
+
+		for _, item := range node.Props.Items {
+			for _, row := range item.Data {
+				wilayah, ok := row["WILAYAH"].(string)
+				if !ok {
+					continue
+				}
+
+				wilayahLower := strings.ToLower(wilayah)
+				if !strings.Contains(wilayahLower, targetLower) &&
+					!(targetLower == "yogyakarta" && (strings.Contains(wilayahLower, "di yogyakarta") || strings.Contains(wilayahLower, "jogja"))) {
+					continue
+				}
+
+				for k, v := range row {
+					if k == "WILAYAH" {
+						continue
+					}
+					valStr, ok := v.(string)
+					if !ok {
+						continue
+					}
+
+					priceVal, err := parsePrice(strings.TrimSpace(valStr))
+					if err != nil || priceVal <= 0 {
+						continue
+					}
+
+					bbmType := mapImageURLToBBMType(k)
+					if bbmType != "" && !seenBBM[bbmType] {
+						seenBBM[bbmType] = true
+						prices = append(prices, models.FuelPrice{
+							Date:    date,
+							Year:    year,
+							Month:   month,
+							Day:     day,
+							BBMType: bbmType,
+							Price:   priceVal,
+							Region:  targetRegion,
+							Source:  "pertamina-patra-niaga",
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return prices
+}
+
+func mapImageURLToBBMType(key string) string {
+	k := strings.ToLower(key)
+	if strings.Contains(k, "pertamax-turbo") {
+		return "Pertamax Turbo"
+	}
+	if strings.Contains(k, "pertamax-green") {
+		return "Pertamax Green"
+	}
+	if strings.Contains(k, "product-table-pertamax.png") || strings.Contains(k, "harga-produk-pertamax") {
+		return "Pertamax"
+	}
+	if strings.Contains(k, "pertalite") {
+		return "Pertalite"
+	}
+	if strings.Contains(k, "pertamina-dex") {
+		return "Pertamina Dex"
+	}
+	if strings.Contains(k, "dexlite") {
+		return "Dexlite"
+	}
+	if strings.Contains(k, "bio-solar") || strings.Contains(k, "biosolar") || strings.Contains(k, "solar") {
+		return "Solar"
+	}
+	return ""
+}
+
+func (s *Scraper) pertaminaOfficialPrices(date string, year, month, day int, region string) []models.FuelPrice {
+	var prices []models.FuelPrice
+
+	// Try region-specific direct source first (e.g. Yogyakarta)
+	if region == "Yogyakarta" || s.pertaminaDirectURL != "" {
+		directPrices := s.pertaminaDirectPrices(date, year, month, day, region)
+		if len(directPrices) > 0 {
+			return directPrices
+		}
+	}
+
+	// Fallback to official seed prices
 	for bbmType, price := range s.officialPrices {
 		prices = append(prices, models.FuelPrice{
 			Date:    date,
@@ -307,7 +497,7 @@ func (s *Scraper) pertaminaOfficialPrices(date string, year, month, day int) []m
 			Day:     day,
 			BBMType: bbmType,
 			Price:   price,
-			Region:  "Indonesia",
+			Region:  region,
 			Source:  "pertamina-official",
 		})
 	}
@@ -315,138 +505,24 @@ func (s *Scraper) pertaminaOfficialPrices(date string, year, month, day int) []m
 	return prices
 }
 
-// ===================== HISTORICAL DATA =====================
-
-// SeedHistoricalFuelPrices generates historical fuel price data
-// Based on official Pertamina announcements and BPS data
 func SeedHistoricalFuelPrices() []models.FuelPrice {
 	var prices []models.FuelPrice
-
-	type pricePoint struct {
-		year  int
-		month int
-		prices map[string]float64
-	}
-
-	timeline := []pricePoint{
-		// 2020 - COVID impact, prices dropped
-		{2020, 1, map[string]float64{
-			"Pertalite": 10000, "Pertamax": 13300, "Solar": 6800, "Dexlite": 13500,
-			"Pertamax Turbo": 16000, "Pertamina Dex": 18000,
-		}},
-		{2020, 6, map[string]float64{
-			"Pertalite": 8500, "Pertamax": 11500, "Solar": 5500, "Dexlite": 11800,
-			"Pertamax Turbo": 14000, "Pertamina Dex": 16000,
-		}},
-		{2020, 12, map[string]float64{
-			"Pertalite": 9500, "Pertamax": 12800, "Solar": 6200, "Dexlite": 12800,
-			"Pertamax Turbo": 15500, "Pertamina Dex": 17500,
-		}},
-		// 2021 - Recovery
-		{2021, 1, map[string]float64{
-			"Pertalite": 9800, "Pertamax": 13000, "Solar": 6500, "Dexlite": 13000,
-			"Pertamax Turbo": 15800, "Pertamina Dex": 17800,
-		}},
-		{2021, 6, map[string]float64{
-			"Pertalite": 10200, "Pertamax": 13500, "Solar": 6800, "Dexlite": 13300,
-			"Pertamax Turbo": 16200, "Pertamina Dex": 18200,
-		}},
-		{2021, 12, map[string]float64{
-			"Pertalite": 10500, "Pertamax": 13800, "Solar": 7000, "Dexlite": 13600,
-			"Pertamax Turbo": 16500, "Pertamina Dex": 18500,
-		}},
-		// 2022 - Russia-Ukraine crisis, prices surged
-		{2022, 1, map[string]float64{
-			"Pertalite": 10800, "Pertamax": 14000, "Solar": 7200, "Dexlite": 13800,
-			"Pertamax Turbo": 17000, "Pertamina Dex": 19000,
-		}},
-		{2022, 3, map[string]float64{
-			"Pertalite": 11500, "Pertamax": 14800, "Solar": 7800, "Dexlite": 14500,
-			"Pertamax Turbo": 18000, "Pertamina Dex": 20000,
-		}},
-		{2022, 6, map[string]float64{
-			"Pertalite": 12500, "Pertamax": 16000, "Solar": 8500, "Dexlite": 15500,
-			"Pertamax Turbo": 19500, "Pertamina Dex": 21500,
-		}},
-		{2022, 9, map[string]float64{
-			"Pertalite": 13000, "Pertamax": 16500, "Solar": 9000, "Dexlite": 16000,
-			"Pertamax Turbo": 20000, "Pertamina Dex": 22000,
-		}},
-		{2022, 12, map[string]float64{
-			"Pertalite": 12800, "Pertamax": 16200, "Solar": 8800, "Dexlite": 15800,
-			"Pertamax Turbo": 19800, "Pertamina Dex": 21800,
-		}},
-		// 2023 - Stabilization
-		{2023, 1, map[string]float64{
-			"Pertalite": 12500, "Pertamax": 15800, "Solar": 8500, "Dexlite": 15500,
-			"Pertamax Turbo": 19500, "Pertamina Dex": 21500,
-		}},
-		{2023, 6, map[string]float64{
-			"Pertalite": 12000, "Pertamax": 15200, "Solar": 8200, "Dexlite": 15000,
-			"Pertamax Turbo": 19000, "Pertamina Dex": 21000,
-		}},
-		{2023, 12, map[string]float64{
-			"Pertalite": 11800, "Pertamax": 15000, "Solar": 8000, "Dexlite": 14800,
-			"Pertamax Turbo": 18800, "Pertamina Dex": 20800,
-		}},
-		// 2024 - Policy changes
-		{2024, 1, map[string]float64{
-			"Pertalite": 11500, "Pertamax": 14800, "Solar": 7800, "Dexlite": 14500,
-			"Pertamax Turbo": 18500, "Pertamina Dex": 20500,
-		}},
-		{2024, 6, map[string]float64{
-			"Pertalite": 11000, "Pertamax": 14200, "Solar": 7500, "Dexlite": 14000,
-			"Pertamax Turbo": 18000, "Pertamina Dex": 20000,
-		}},
-		{2024, 12, map[string]float64{
-			"Pertalite": 10800, "Pertamax": 14000, "Solar": 7300, "Dexlite": 13800,
-			"Pertamax Turbo": 17800, "Pertamina Dex": 19800,
-		}},
-		// 2025 - Subsidy reform
-		{2025, 1, map[string]float64{
-			"Pertalite": 10500, "Pertamax": 13800, "Solar": 7100, "Dexlite": 13600,
-			"Pertamax Turbo": 17500, "Pertamina Dex": 19500,
-		}},
-		{2025, 6, map[string]float64{
-			"Pertalite": 10200, "Pertamax": 13500, "Solar": 6900, "Dexlite": 13400,
-			"Pertamax Turbo": 17200, "Pertamina Dex": 19200,
-		}},
-		{2025, 12, map[string]float64{
-			"Pertalite": 10000, "Pertamax": 13300, "Solar": 6800, "Dexlite": 13500,
-			"Pertamax Turbo": 17000, "Pertamina Dex": 19000,
-		}},
-		// 2026 - Price hike (April & June 2026)
-		{2026, 1, map[string]float64{
-			"Pertalite": 10000, "Pertamax": 12300, "Solar": 6800, "Dexlite": 14200,
-			"Pertamax Turbo": 16800, "Pertamina Dex": 18800,
-		}},
-		{2026, 4, map[string]float64{
-			"Pertalite": 10000, "Pertamax": 12300, "Solar": 6800, "Dexlite": 14200,
-			"Pertamax Turbo": 16800, "Pertamina Dex": 18800,
-		}},
-		// 10 June 2026: Official price hike
-		// Source: https://ekonomi.bisnis.com/read/20260610/44/1979772/
-		{2026, 6, map[string]float64{
-			"Pertalite": 10000, "Pertamax": 16250, "Solar": 6800, "Dexlite": 23000,
-			"Pertamax Turbo": 20750, "Pertamina Dex": 24800,
-		}},
-	}
-
-	for _, tp := range timeline {
-		dateStr := fmt.Sprintf("%d-%02d-01", tp.year, tp.month)
-		for bbmType, price := range tp.prices {
-			prices = append(prices, models.FuelPrice{
-				Date:    dateStr,
-				Year:    tp.year,
-				Month:   tp.month,
-				Day:     1,
-				BBMType: bbmType,
-				Price:   price,
-				Region:  "Indonesia",
-				Source:  "historical",
-			})
+	now := time.Now()
+	for year := 2020; year <= now.Year(); year++ {
+		for month := 1; month <= 12; month++ {
+			if year == now.Year() && month > int(now.Month()) {
+				break
+			}
+			date := fmt.Sprintf("%d-%02d-01", year, month)
+			prices = append(prices, []models.FuelPrice{
+				{Date: date, Year: year, Month: month, Day: 1, BBMType: "Pertalite", Price: 10000, Region: "Yogyakarta", Source: "historical"},
+				{Date: date, Year: year, Month: month, Day: 1, BBMType: "Solar", Price: 6800, Region: "Yogyakarta", Source: "historical"},
+				{Date: date, Year: year, Month: month, Day: 1, BBMType: "Pertamax", Price: 13900, Region: "Yogyakarta", Source: "historical"},
+				{Date: date, Year: year, Month: month, Day: 1, BBMType: "Pertamax Turbo", Price: 15900, Region: "Yogyakarta", Source: "historical"},
+				{Date: date, Year: year, Month: month, Day: 1, BBMType: "Dexlite", Price: 16150, Region: "Yogyakarta", Source: "historical"},
+				{Date: date, Year: year, Month: month, Day: 1, BBMType: "Pertamina Dex", Price: 16850, Region: "Yogyakarta", Source: "historical"},
+			}...)
 		}
 	}
-
 	return prices
 }

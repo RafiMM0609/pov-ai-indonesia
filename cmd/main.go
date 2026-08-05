@@ -35,7 +35,18 @@ func main() {
 	// --- Components ---
 	aiClient := ai.NewClient(cfg.OpenRouterAPIKey, cfg.OpenRouterBaseURL, cfg.POVModel, cfg.AITemperature, cfg.AIMaxTokens, cfg.AIHTTPTimeout, cfg.AIHTTPReferer, cfg.AIHTTPTitle)
 
-	sc := scraper.New(cfg.SeedPrices, cfg.FrankfurterStartDate, cfg.ScraperHTTPTimeout, cfg.FrankfurterBaseURL, cfg.SearchTimeout, cfg.SearchEngineURL, cfg.SearchDomainFilter)
+	sc := scraper.New(
+		cfg.SeedPrices,
+		cfg.FrankfurterStartDate,
+		cfg.ScraperHTTPTimeout,
+		cfg.FrankfurterBaseURL,
+		cfg.SearchTimeout,
+		cfg.SearchEngineURL,
+		cfg.SearchDomainFilter,
+		cfg.PertaminaDirectURL,
+		cfg.PertaminaDirectToken,
+		cfg.PertaminaDirectRegion,
+	)
 	es := scraper.NewEnhancedScraper(cfg)
 	km := knowledge.NewKnowledgeManager(cfg.KnowledgeDir, aiClient, database)
 

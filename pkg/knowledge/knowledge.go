@@ -258,6 +258,7 @@ func (km *KnowledgeManager) genExchangeRate(rates []models.ExchangeRate, year, m
 	var factors []Factor
 
 	if llm {
+		time.Sleep(3 * time.Second)
 		dataJSON := formatRatesData(rates)
 		macroContext := km.getMacroContext(year, month)
 		resp, err := km.aiClient.AnalyzeExchangeRate(dataJSON, period, macroContext)
@@ -305,6 +306,7 @@ func (km *KnowledgeManager) genFuelPrice(prices []models.FuelPrice, year, month 
 	var factors []Factor
 
 	if llm {
+		time.Sleep(3 * time.Second)
 		dataJSON := formatFuelData(prices)
 		macroContext := km.getMacroContext(year, month)
 		resp, err := km.aiClient.AnalyzeFuelPrice(dataJSON, period, macroContext)
@@ -352,6 +354,7 @@ func (km *KnowledgeManager) genGoldPrice(prices []models.CommodityPrice, year, m
 	var factors []Factor
 
 	if llm {
+		time.Sleep(3 * time.Second)
 		dataJSON := formatGoldData(prices)
 		macroContext := km.getMacroContext(year, month)
 		resp, err := km.aiClient.AnalyzeGoldPrice(dataJSON, period, macroContext)
@@ -462,6 +465,15 @@ func FactorsToStrings(factors []Factor) []string {
 // --- Data formatting ---
 
 func formatRatesData(rates []models.ExchangeRate) string {
+	if len(rates) > 30 {
+		lines := make([]string, 0, 60)
+		for i, r := range rates {
+			if i == 0 || i == len(rates)-1 || i%7 == 0 {
+				lines = append(lines, fmt.Sprintf("%s: Rp %.0f", r.Date, r.Rate))
+			}
+		}
+		return strings.Join(lines, "\n")
+	}
 	lines := make([]string, 0, len(rates))
 	for _, r := range rates {
 		lines = append(lines, fmt.Sprintf("%s: Rp %.0f", r.Date, r.Rate))
@@ -484,6 +496,15 @@ func formatFuelData(prices []models.FuelPrice) string {
 		}
 		avg /= float64(len(prs))
 		lines = append(lines, fmt.Sprintf("%s %s: Rp %.0f", parts[0], parts[1], avg))
+	}
+	if len(lines) > 30 {
+		sampled := make([]string, 0, 30)
+		for i, l := range lines {
+			if i == 0 || i == len(lines)-1 || i%3 == 0 {
+				sampled = append(sampled, l)
+			}
+		}
+		return strings.Join(sampled, "\n")
 	}
 	return strings.Join(lines, "\n")
 }

@@ -75,3 +75,104 @@ func TestExtractLatestPrices(t *testing.T) {
 		}
 	}
 }
+
+func TestParsePertaminaPatraNiagaJSON(t *testing.T) {
+	jsonSample := []byte(`{
+		"data": {
+			"content": {
+				"node1": {
+					"displayName": "ProductTable",
+					"props": {
+						"items": [
+							{
+								"title": "Gasoline",
+								"data": [
+									{
+										"WILAYAH": "Prov. DI Yogyakarta",
+										"https://pertaminapatraniaga.com/file/files/2024/08/product-table-pertamax-turbo.png": " 18,300 ",
+										"https://pertaminapatraniaga.com/file/files/2024/08/product-table-pertamax-green-95.png": " 16,600 ",
+										"https://pertaminapatraniaga.com/file/files/2024/08/product-table-pertamax.png": " 15,950 ",
+										"https://pertaminapatraniaga.com/file/files/2024/08/product-table-pertalite.png": " 10,000 "
+									}
+								]
+							},
+							{
+								"title": "Gasoil",
+								"data": [
+									{
+										"WILAYAH": "Prov. DI Yogyakarta",
+										"https://pertaminapatraniaga.com/file/files/2024/08/product-table-pertamina-dex.png": " 21,150 ",
+										"https://pertaminapatraniaga.com/file/files/2024/08/product-table-dexlite.png": " 19,700 ",
+										"https://pertaminapatraniaga.com/file/files/2026/05/harga-produk-bio-solar-subsidi.jpg": " 6,800 "
+									}
+								]
+							}
+						]
+					}
+				}
+			}
+		}
+	}`)
+
+	prices := parsePertaminaPatraNiagaJSON(jsonSample, "2026-08-05", 2026, 8, 5, "Yogyakarta")
+	expectedMap := map[string]float64{
+		"Pertamax Turbo": 18300,
+		"Pertamax Green": 16600,
+		"Pertamax":       15950,
+		"Pertalite":      10000,
+		"Pertamina Dex":  21150,
+		"Dexlite":        19700,
+		"Solar":          6800,
+	}
+
+	if len(prices) != len(expectedMap) {
+		t.Errorf("Expected %d fuel prices, got %d", len(expectedMap), len(prices))
+	}
+
+	for _, p := range prices {
+		expVal, exists := expectedMap[p.BBMType]
+		if !exists {
+			t.Errorf("Unexpected BBMType extracted: %s", p.BBMType)
+			continue
+		}
+		if p.Price != expVal {
+			t.Errorf("BBMType %s: expected price %f, got %f", p.BBMType, expVal, p.Price)
+		}
+		if p.Region != "Yogyakarta" {
+			t.Errorf("Expected region 'Yogyakarta', got %q", p.Region)
+		}
+		if p.Source != "pertamina-patra-niaga" {
+			t.Errorf("Expected source 'pertamina-patra-niaga', got %q", p.Source)
+		}
+	}
+}
+
+func TestLivePertaminaDirectScrape(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping live network test in short mode")
+	}
+	s := New(
+		map[string]float64{"Pertalite": 10000},
+		"2020-01-01",
+		30,
+		"https://api.frankfurter.app",
+		10,
+		"https://html.duckduckgo.com/html/",
+		"bisnis.com,cnbcindonesia.com",
+		"https://pertaminapatraniaga.com/page/harga-terbaru-bbm",
+		"",
+		"Yogyakarta",
+	)
+
+	prices, err := s.ScrapeFuelPrices()
+	if err != nil {
+		t.Fatalf("ScrapeFuelPrices live failed: %v", err)
+	}
+	if len(prices) == 0 {
+		t.Fatalf("Expected non-empty live fuel prices for Yogyakarta")
+	}
+	t.Logf("Successfully fetched %d live fuel prices for Yogyakarta:", len(prices))
+	for _, p := range prices {
+		t.Logf(" - %s: Rp %.2f (Region: %s, Source: %s)", p.BBMType, p.Price, p.Region, p.Source)
+	}
+}

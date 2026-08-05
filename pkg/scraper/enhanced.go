@@ -10,7 +10,7 @@ import (
 )
 
 // EnhancedScraper wraps the original scraper with government data integration
-// Uses seed data for APIs requiring registration (BPS, BI, OJK)
+// Uses seed data for APIs requiring registration (BPS, BI, data.go.id, OJK)
 // Uses live public APIs where available (Frankfurter, Pertamina)
 type EnhancedScraper struct {
 	*Scraper
@@ -29,6 +29,9 @@ func NewEnhancedScraper(cfg *config.Config) *EnhancedScraper {
 			cfg.SearchTimeout,
 			cfg.SearchEngineURL,
 			cfg.SearchDomainFilter,
+			cfg.PertaminaDirectURL,
+			cfg.PertaminaDirectToken,
+			cfg.PertaminaDirectRegion,
 		),
 		govClient: govapi.NewClient(
 			cfg.GovHTTPTimeout,

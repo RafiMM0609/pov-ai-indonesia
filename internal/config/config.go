@@ -9,38 +9,41 @@ import (
 
 type Config struct {
 	// Server
-	Port        string
-	DataDir     string
-	KnowledgeDir string
-	DBPath      string
-	StaticDir   string
-	TemplateDir string
-	CORSAllowOrigin string
+	Port             string
+	DataDir          string
+	KnowledgeDir     string
+	DBPath           string
+	StaticDir        string
+	TemplateDir      string
+	CORSAllowOrigin  string
 
 	// Database
-	DBMaxOpenConns    int
-	DBMaxIdleConns    int
-	DBConnMaxLifetime int // minutes
+	DBMaxOpenConns       int
+	DBMaxIdleConns       int
+	DBConnMaxLifetime    int // minutes
 
 	// Scraper
-	ScrapeInterval      int
-	FrankfurterBaseURL  string
-	FrankfurterStartDate string
-	WebScraperEnabled   bool
-	SearchTimeout       int
-	SearchEngineURL     string
-	SearchDomainFilter  string
-	ScraperHTTPTimeout  int // seconds
+	ScrapeInterval         int
+	FrankfurterBaseURL     string
+	FrankfurterStartDate   string
+	WebScraperEnabled      bool
+	SearchTimeout          int
+	SearchEngineURL        string
+	SearchDomainFilter     string
+	ScraperHTTPTimeout     int // seconds
+	PertaminaDirectURL     string
+	PertaminaDirectToken   string
+	PertaminaDirectRegion  string
 
 	// AI Client
-	OpenRouterAPIKey  string
-	OpenRouterBaseURL string
-	POVModel          string
-	AITemperature     float64
-	AIMaxTokens       int
-	AIHTTPTimeout     int    // seconds
-	AIHTTPReferer     string
-	AIHTTPTitle       string
+	OpenRouterAPIKey   string
+	OpenRouterBaseURL  string
+	POVModel           string
+	AITemperature      float64
+	AIMaxTokens        int
+	AIHTTPTimeout      int    // seconds
+	AIHTTPReferer      string
+	AIHTTPTitle        string
 
 	// Seed Prices
 	SeedPrices map[string]float64
@@ -50,17 +53,17 @@ type Config struct {
 	CronGovData   string // cron expression
 
 	// Gov API
-	GovHTTPTimeout  int // seconds
-	BPSBaseURL      string
-	BIBaseURL       string
-DataGoBaseURL   string
-	OJKBaseURL      string
-	BPSAPIRateLimit  int // milliseconds
-	CKANAPIRateLimit int // milliseconds
-	OJKEnabled      bool
-	BIBI7DRR        float64
-	BIDepositRate   float64
-	BILendingRate   float64
+	GovHTTPTimeout   int // seconds
+	BPSBaseURL       string
+	BIBaseURL        string
+	DataGoBaseURL    string
+	OJKBaseURL       string
+	BPSAPIRateLimit   int // milliseconds
+	CKANAPIRateLimit  int // milliseconds
+	OJKEnabled       bool
+	BIBI7DRR         float64
+	BIDepositRate    float64
+	BILendingRate    float64
 }
 
 func Load() *Config {
@@ -70,11 +73,11 @@ func Load() *Config {
 	seedPrices := map[string]float64{
 		"Pertalite":      10000,
 		"Solar":          6800,
-		"Pertamax":       16250,
-		"Pertamax Green": 17000,
-		"Pertamax Turbo": 20750,
-		"Dexlite":        23000,
-		"Pertamina Dex":  24800,
+		"Pertamax":       15950,
+		"Pertamax Green": 16600,
+		"Pertamax Turbo": 18300,
+		"Dexlite":        19700,
+		"Pertamina Dex":  21150,
 	}
 
 	for k := range seedPrices {
@@ -111,8 +114,13 @@ func Load() *Config {
 		SearchDomainFilter:   getEnv("SEARCH_DOMAIN_FILTER", "bisnis.com,cnbcindonesia.com"),
 		ScraperHTTPTimeout:   getEnvInt("SCRAPER_HTTP_TIMEOUT", 30),
 
+		// PertaminaDirectURL, PertaminaDirectToken, and PertaminaDirectRegion are required for direct access to pertaminapatraniaga.com API
+		PertaminaDirectURL:    getEnv("PERTAMINA_DIRECT_URL", "https://pertaminapatraniaga.com/page/harga-terbaru-bbm"),
+		PertaminaDirectToken:  getEnv("PERTAMINA_DIRECT_TOKEN", ""),
+		PertaminaDirectRegion: getEnv("PERTAMINA_DIRECT_REGION", "Yogyakarta"),
+
 		// AI Client
-		OpenRouterAPIKey:  os.Getenv("OPENROUTER_API_KEY"),
+		OpenRouterAPIKey:  getEnv("OPENROUTER_API_KEY", ""),
 		OpenRouterBaseURL: getEnv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
 		POVModel:          getEnv("POV_AI_MODEL", "openrouter/owl-alpha"),
 		AITemperature:     getEnvFloat("AI_TEMPERATURE", 0.7),
@@ -134,7 +142,7 @@ func Load() *Config {
 		BIBaseURL:        getEnv("BI_BASE_URL", "https://api.bi.go.id/v1"),
 		DataGoBaseURL:    getEnv("DATA_GO_BASE_URL", "https://data.go.id/api/3"),
 		OJKBaseURL:       getEnv("OJK_BASE_URL", "https://api.ojk.go.id/v1"),
-		BPSAPIRateLimit:  getEnvInt("BPS_API_RATE_LIMIT", 100),
+		BPSAPIRateLimit:   getEnvInt("BPS_API_RATE_LIMIT", 100),
 		CKANAPIRateLimit: getEnvInt("CKAN_API_RATE_LIMIT", 200),
 		OJKEnabled:       getEnvBool("OJK_ENABLED", false),
 		BIBI7DRR:         getEnvFloat("BI_BI7DRR_RATE", 5.50),
@@ -162,7 +170,7 @@ func loadEnvFile(path string) {
 		}
 		key := strings.TrimSpace(parts[0])
 		val := strings.TrimSpace(parts[1])
-		if len(val) >= 2 && ((val[0] == '"' && val[len(val)-1] == '"') || (val[0] == '\'' && val[len(val)-1] == '\'')) {
+		if len(val) >= 2 && ((strings.HasPrefix(val, "\"") && strings.HasSuffix(val, "\"")) || (strings.HasPrefix(val, "'") && strings.HasSuffix(val, "'"))) {
 			val = val[1 : len(val)-1]
 		}
 		if os.Getenv(key) == "" {
